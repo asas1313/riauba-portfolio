@@ -33,7 +33,7 @@ flowchart TD
         cvts["cv.ts<br/>loads cv.yaml via Vite ?raw import"]
         cvschema["cv.schema.ts<br/>Zod schema + parseCv()"]
         cvpublishts["cv.publish.ts<br/>cvForBuild (TODO-stripping)"]
-        structureddatats["structured-data.ts<br/>buildPersonJsonLd()"]
+        structureddatats["structured-data.ts<br/>buildPersonJsonLd() / toSafeJsonLd()"]
         projectsts["projects.ts<br/>getFeaturedProjectsSorted()"]
         seots["seo.ts<br/>buildPageSeo()"]
     end
@@ -65,7 +65,8 @@ flowchart TD
     cvpublishts --> indexastro
     cvpublishts --> cvastro
     cvpublishts --> cvprintastro
-    structureddatats --> cvastro
+    structureddatats -->|"buildPersonJsonLd(cvForBuild)"| cvastro
+    structureddatats -->|"cv.astro's result flows in as the<br/>structuredData prop; toSafeJsonLd()<br/>renders the &lt;script&gt; tag"| baselayout
     cvastro --> cvcontentastro
     cvprintastro --> cvcontentastro
     contentconfig --> projectsts
@@ -138,7 +139,16 @@ Behaviour:
 - `findTodoFields` recursively walks the cloned tree and returns the dot-path of every
   matching string leaf (array indices appear as numeric segments, e.g. `"work.0.endDate"`).
   `classifyTodoPath` then consults the Zod *shape* of `cvSchema` (not the data) to decide what
-  stripping a given path means:
+  stripping a given path means. **Why schema-aware rather than one blanket rule:** a single
+  fixed policy is wrong in both directions. Always deleting just the field would publish a
+  `Work` entry missing a *required* field (e.g. a TODO `position` but a real `name` and dates),
+  silently shipping a half-filled record every downstream consumer (`CvContent.astro`, the PDF,
+  the JSON-LD) assumes is complete. Always dropping the whole containing record instead would
+  over-delete: a TODO in an *optional* field like `work[].endDate` (an ongoing role simply
+  hasn't ended yet) or a single still-TODO item inside a plain string array like `highlights`
+  would needlessly destroy an otherwise-complete, already-written work entry along with it.
+  Consulting the schema's required/optional shape per field lets the stripper pick the
+  narrowest removal that is still safe to publish for each case:
   - the path's last segment is an index into a plain string array (`highlights`, `skills.*.keywords`)
     → remove just that array element;
   - the path resolves to an **optional** object field (anything accepting `undefined`, checked
