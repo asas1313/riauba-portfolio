@@ -9,7 +9,7 @@ Port the visual layer only — do NOT migrate onto the AstroPaper codebase.
 Keep all existing routes, content collections, data logic and tests.
 
 ## Scope
-- Design tokens as CSS variables (Tailwind v4 @theme): background, foreground,
+- Design tokens as CSS variables (plain CSS custom properties): background, foreground,
   muted, border, one accent colour (deep blue/teal family), light + dark sets.
 - Dark mode: follows prefers-color-scheme, plus a manual toggle persisted in
   localStorage; no flash of wrong theme (inline script in <head>).
