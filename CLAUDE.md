@@ -8,7 +8,7 @@ Lithuanian version later (spec 005).
 - Astro 7 (static output), TypeScript strict, plain CSS (no Tailwind), zero client JS by default
   (upgraded from Astro 5 during spec 001: 5.x/6.x had unpatched critical/high npm audit advisories)
 - Content: `content/cv.yaml` (single source of truth for CV) and `content/projects/*.md` (Astro content collections)
-- PDF CV generated at build time with Playwright printing the `/cv/print` route → `dist/andrius-r-cv.pdf`
+- PDF CV generated at build time with Playwright printing the `/cv/print` route → `dist/andrius-riauba-cv.pdf`
 - Tests: Vitest (unit, content schema validation), Playwright (e2e, accessibility via @axe-core/playwright)
 - Docs: MkDocs Material under docs/
 - Hosting: static files served by Caddy on a Hetzner VPS; production riauba.org, staging staging.riauba.org

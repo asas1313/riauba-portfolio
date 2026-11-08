@@ -181,7 +181,7 @@ CI (`.github/workflows/ci.yml`) runs, on every pull request and push to `main`: 
 
 `npm run build:pdf` currently runs `scripts/build-pdf-stub.mjs`, which only logs a message and
 exits 0. It exists purely so `make build` succeeds end-to-end before spec 002 (CV page and PDF)
-lands; it does not generate `dist/andrius-r-cv.pdf`. Do not mistake it for the real PDF
+lands; it does not generate `dist/andrius-riauba-cv.pdf`. Do not mistake it for the real PDF
 generation step described in CLAUDE.md (Playwright printing `/cv/print`) — that route does not
 exist yet.
 

@@ -251,6 +251,18 @@ describe("stripTodoFields", () => {
     expect(cv).toEqual(fixture);
     expect(strippedPaths).toEqual([]);
   });
+
+  it("throws a clear error instead of nulling out basics when a required top-level basics field (name) is TODO", () => {
+    const fixture = baseCvFixture();
+    fixture.basics.name = "TODO";
+    expect(() => stripTodoFields(fixture)).toThrow(/basics\.name/);
+  });
+
+  it("throws a clear error instead of nulling out basics.location when a required nested field (location.city) is TODO", () => {
+    const fixture = baseCvFixture();
+    fixture.basics.location.city = "TODO";
+    expect(() => stripTodoFields(fixture)).toThrow(/basics\.location\.city/);
+  });
 });
 
 describe("getPublishableCv", () => {

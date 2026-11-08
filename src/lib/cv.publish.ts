@@ -185,7 +185,17 @@ export function stripTodoFields(cv: Cv): StripTodoFieldsResult {
     if (Array.isArray(grandParent)) {
       markRemoval(grandParent, Number(key));
     } else if (grandParent !== null && typeof grandParent === "object") {
-      (grandParent as Record<string, unknown>)[key] = null;
+      // There is no containing array record to drop (e.g. "basics.name" or
+      // "basics.location.city" — the required field lives directly on the
+      // top-level `basics` object, or on a nested-but-non-array object
+      // reached via `basics`). Per this project's "fail loudly" convention,
+      // silently nulling out `basics` (or a part of it) would crash every
+      // downstream consumer with a cryptic `TypeError` instead of a clear
+      // message — so we throw here instead, naming the exact field path.
+      throw new Error(
+        `cv.publish: required field "${pathStr}" is marked TODO, but it has no containing array record (profile/work/education/language entry) to omit from the production build. ` +
+          `Replace the TODO placeholder for "${pathStr}" in content/cv.yaml before running a production build.`,
+      );
     }
   }
 
