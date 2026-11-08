@@ -1,3 +1,5 @@
+import { markdownToMdast } from "satteri";
+
 // Spec 003, AC-5: omit any top-level markdown body paragraph starting with
 // the whole word "TODO" from production builds, warning once per affected
 // file — the same marker and whole-word/case-sensitive rule as
@@ -123,6 +125,22 @@ interface SatteriMdastRootLike {
 export interface SatteriTodoParagraphPluginOptions {
   enabled: boolean;
   warn: (message: string) => void;
+  /**
+   * Invoked with the number of top-level TODO paragraphs removed from this
+   * document (zero when none), right before `warn`. Lets a caller outside
+   * Astro's content-layer render — namely
+   * `countTopLevelTodoParagraphsInMarkdownBody`/`warnAboutTodoParagraphsInFiles`
+   * below, driving the cache-independent `astro:build:start` warning — read
+   * back exactly the count this plugin itself computed, by running this
+   * same plugin through `satteri`'s standalone `markdownToMdast`, instead
+   * of re-implementing or re-parsing anything. This is what guarantees the
+   * build-start warning and the real stripping can never disagree (see the
+   * "Cache-independent warning" section below for the full history,
+   * including review 2's BLOCKER: an earlier, independent text-level
+   * approximation here *could* disagree with this plugin, and did, on a
+   * loose-list lazy continuation and a setext heading).
+   */
+  onRemoved?: (count: number) => void;
 }
 
 /**
@@ -138,6 +156,7 @@ export interface SatteriTodoParagraphPluginOptions {
 export function createSatteriTodoParagraphPlugin({
   enabled,
   warn,
+  onRemoved,
 }: SatteriTodoParagraphPluginOptions) {
   return {
     name: "strip-todo-paragraphs",
@@ -146,8 +165,9 @@ export function createSatteriTodoParagraphPlugin({
       const todoParagraphs = root.children.filter((node) =>
         isTodoParagraph(node, (n) => context.textContent(n)),
       );
-      if (todoParagraphs.length === 0) return;
       for (const node of todoParagraphs) context.removeNode(node);
+      onRemoved?.(todoParagraphs.length);
+      if (todoParagraphs.length === 0) return;
       const path = context.fileURL ? context.fileURL.pathname : "unknown file";
       warn(
         `markdown-todo: omitted ${todoParagraphs.length} TODO-marked paragraph(s) from ${path}`,
@@ -186,6 +206,32 @@ export function createSatteriTodoParagraphPlugin({
 // cached `entry.rendered` was itself already correctly stripped the first
 // time) — only the *warning* responsibility moves here, to avoid firing
 // twice on a cold cache and zero times on a warm one.
+//
+// Review 2's BLOCKER: this cache-independent count used to be computed by a
+// bespoke, dependency-free text-level block splitter (split raw source on
+// blank lines, classify each block's first line with a hand-written
+// "is this the start of a non-paragraph block" regex). That is a *second*,
+// independently-maintained approximation of "is this a top-level TODO
+// paragraph" alongside `isTodoParagraph`/`createSatteriTodoParagraphPlugin`
+// above — and it disagreed with the real mdast parse on at least two
+// CommonMark shapes the splitter's regex couldn't recognise: a lazy
+// continuation line of a loose list item indented only to the list marker's
+// content column (2-3 spaces, below the splitter's `\s{4,}` indented-code-
+// block threshold — misread as a new top-level paragraph, not still part of
+// the list item), and a `TODO ...\n===` setext heading (misread as a
+// paragraph; mdast correctly parses it as a heading). Both caused a false-
+// positive "omitted a TODO paragraph" warning while the literal TODO text
+// still shipped to production HTML untouched — violating the very property
+// this mechanism exists to guarantee.
+//
+// Fix: delete the bespoke splitter entirely. `countTopLevelTodoParagraphsInMarkdownBody`
+// below now parses the body with the exact same mdast parser
+// (`satteri`'s `markdownToMdast`, the same native parser Astro's
+// `satteri()` Markdown processor uses) and runs it through the *literal
+// same* `createSatteriTodoParagraphPlugin` that performs the real
+// stripping, reading back its `onRemoved` count. There is now exactly one
+// piece of logic that decides "is this a top-level TODO paragraph" — the
+// warning and the actual strip can no longer drift apart.
 
 const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
@@ -196,79 +242,33 @@ export function stripFrontmatter(rawSource: string): string {
   return rawSource.replace(FRONTMATTER_PATTERN, "");
 }
 
-/** Matches the *first line* of a blank-line-delimited block that marks it
- * as something other than a plain paragraph: an ATX heading, blockquote,
- * fenced code block, list item (bulleted or ordered), thematic break, or
- * indented code block. Kept deliberately simple (no full CommonMark block
- * parser) since this only has to decide *whether to warn*, not what to
- * strip — `createSatteriTodoParagraphPlugin`'s mdast-based check remains
- * the sole source of truth for the actual build output. */
-const NON_PARAGRAPH_BLOCK_START =
-  /^(#{1,6}(\s|$)|>|```|~~~|[-*+]\s|\d+[.)]\s|-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$|\s{4,}\S)/;
-
 /**
- * A dependency-free, text-level approximation of "top-level TODO
- * paragraph" detection (see the header comment above), operating directly
- * on a markdown file body's raw source instead of an mdast tree: blocks
- * are split on blank lines, lines inside a fenced code block are never
- * treated as their own blocks, and a kept block counts as a TODO paragraph
- * if, after stripping any leading non-alphanumeric characters (so a
- * leading `**TODO**`, `` `TODO` `` or `[TODO](url)` is still caught,
- * mirroring `isTodoParagraph`'s recursively-joined-text behaviour), its
- * text matches `/^TODO\b/`.
+ * Counts top-level TODO paragraphs in a markdown file body (frontmatter
+ * already stripped), for the cache-independent `astro:build:start` warning.
+ * Parses `body` with `satteri`'s `markdownToMdast` — the same native mdast
+ * parser Astro's real `satteri()` Markdown processor uses — and runs the
+ * result through `createSatteriTodoParagraphPlugin` itself (the same
+ * plugin that performs the real stripping at render time), reading back
+ * the count via `onRemoved` instead of re-implementing or approximating
+ * the matching logic. This guarantees the count can never disagree with
+ * what the real plugin would strip from the same source.
  */
 export function countTopLevelTodoParagraphsInMarkdownBody(
   body: string,
 ): number {
-  const lines = body.split("\n");
-  let count = 0;
-  let inFence = false;
-  let fenceMarker = "";
-  let blockLines: string[] = [];
-  let blockExcluded = false;
-
-  function flush() {
-    if (blockLines.length === 0) return;
-    if (!blockExcluded) {
-      const text = blockLines.join(" ").trim();
-      const stripped = text.replace(/^[^A-Za-z0-9]+/, "");
-      if (/^TODO\b/.test(stripped)) count++;
-    }
-    blockLines = [];
-    blockExcluded = false;
-  }
-
-  for (const line of lines) {
-    const fenceMatch = /^(```|~~~)/.exec(line);
-    if (fenceMatch && !inFence) {
-      flush();
-      inFence = true;
-      fenceMarker = fenceMatch[1];
-      blockExcluded = true;
-      blockLines.push(line);
-      continue;
-    }
-    if (fenceMatch && inFence && fenceMatch[1] === fenceMarker) {
-      blockLines.push(line);
-      flush();
-      inFence = false;
-      continue;
-    }
-    if (inFence) {
-      blockLines.push(line);
-      continue;
-    }
-    if (line.trim() === "") {
-      flush();
-      continue;
-    }
-    if (blockLines.length === 0) {
-      blockExcluded = NON_PARAGRAPH_BLOCK_START.test(line);
-    }
-    blockLines.push(line);
-  }
-  flush();
-  return count;
+  let removedCount = 0;
+  markdownToMdast(body, {
+    mdastPlugins: [
+      createSatteriTodoParagraphPlugin({
+        enabled: true,
+        warn: () => {},
+        onRemoved: (count) => {
+          removedCount = count;
+        },
+      }),
+    ],
+  });
+  return removedCount;
 }
 
 export interface TodoParagraphFile {
