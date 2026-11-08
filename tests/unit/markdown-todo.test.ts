@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  countTopLevelTodoParagraphsInMarkdownBody,
   createSatteriTodoParagraphPlugin,
   isTodoParagraph,
   remarkStripTodoParagraphs,
   removeTodoParagraphs,
+  stripFrontmatter,
+  warnAboutTodoParagraphsInFiles,
   type MdastRootLike,
 } from "../../src/lib/markdown-todo.ts";
 
@@ -210,5 +213,113 @@ describe("createSatteriTodoParagraphPlugin", () => {
     const root = { children: [paragraph("Kept.")] };
     plugin.before(root, ctx);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("stripFrontmatter", () => {
+  it("removes a leading YAML frontmatter block", () => {
+    const raw = "---\ntitle: X\nstatus: live\n---\nBody text.\n";
+    expect(stripFrontmatter(raw)).toBe("Body text.\n");
+  });
+
+  it("is a no-op when there is no frontmatter delimiter", () => {
+    expect(stripFrontmatter("Just a body.\n")).toBe("Just a body.\n");
+  });
+});
+
+describe("countTopLevelTodoParagraphsInMarkdownBody (AC-5, cache-independent path)", () => {
+  it("counts a single plain top-level TODO paragraph", () => {
+    const body = "Intro paragraph.\n\nTODO (Andrius): fill this in.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(1);
+  });
+
+  it("counts multiple top-level TODO paragraphs", () => {
+    const body = "TODO: one.\n\nKept.\n\nTODO: two.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(2);
+  });
+
+  it("counts a TODO paragraph starting with a bold run", () => {
+    const body = "**TODO** (Andrius): fill this in.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(1);
+  });
+
+  it("counts a TODO paragraph starting with a markdown link label", () => {
+    const body = "[TODO](https://example.com) fill this in.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(1);
+  });
+
+  it("does not count a paragraph that merely contains TODO later in the sentence", () => {
+    const body = "Ask Andrius about the TODO list.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  it("does not count lowercase todo or a substring like Kristodoras", () => {
+    const body = "todo: lowercase.\n\nKristodoras works here.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  it("does not count a TODO heading", () => {
+    expect(countTopLevelTodoParagraphsInMarkdownBody("## TODO\n")).toBe(0);
+  });
+
+  it("does not count a TODO paragraph nested inside a list item (top-level-only scope)", () => {
+    const body = "- TODO: nested, out of scope.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  it("does not count a TODO paragraph nested inside a blockquote", () => {
+    const body = "> TODO: nested, out of scope.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  it("does not count TODO text inside a fenced code block", () => {
+    const body = "```\nTODO: just an example in code, not a real todo.\n```\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  it("is a no-op on a body with no TODO paragraphs", () => {
+    const body = "Intro.\n\nMore text.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+});
+
+describe("warnAboutTodoParagraphsInFiles (AC-5, cache-independent path)", () => {
+  it("warns once per affected file, naming the path and the count", () => {
+    const warn = vi.fn();
+    warnAboutTodoParagraphsInFiles({
+      files: [
+        {
+          path: "content/projects/atsidek.md",
+          rawSource: "---\ntitle: X\n---\nTODO: one.\n",
+        },
+        {
+          path: "content/projects/homelab.md",
+          rawSource: "---\ntitle: Y\n---\nKept, no TODO here.\n",
+        },
+      ],
+      warn,
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("1");
+    expect(warn.mock.calls[0][0]).toContain("content/projects/atsidek.md");
+  });
+
+  it("does not warn at all when no file has a TODO paragraph", () => {
+    const warn = vi.fn();
+    warnAboutTodoParagraphsInFiles({
+      files: [{ path: "content/projects/homelab.md", rawSource: "Kept.\n" }],
+      warn,
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("is independent of any render/content-layer cache: calling it repeatedly against the same unchanged input warns every time", () => {
+    const warn = vi.fn();
+    const files = [
+      { path: "content/projects/atsidek.md", rawSource: "TODO: one.\n" },
+    ];
+    warnAboutTodoParagraphsInFiles({ files, warn });
+    warnAboutTodoParagraphsInFiles({ files, warn });
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });

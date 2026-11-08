@@ -21,7 +21,13 @@
   while implementing it: Astro 7.4 ships Sätteri, not the classic remark/unified pipeline, as
   its default Markdown processor (so the plugin targets Sätteri's native API instead of
   `markdown.remarkPlugins`), and Astro's `defineConfig` doesn't support a functional/callback
-  form (so the production/dev gating is wired through a small inline integration instead).
+  form (so the production/dev gating is wired through a small inline integration instead). The
+  warning itself is emitted from a separate, cache-independent scan of `content/projects/*.md`
+  on an `astro:build:start` hook, not from the Sätteri plugin's `before` hook — review found
+  that Astro's content-layer cache skips re-rendering (and therefore skips re-invoking the
+  plugin) for a file whose on-disk content is unchanged since the last sync, so the warning
+  would otherwise silently stop firing on the second and later consecutive builds against a
+  warm cache. The `astro:build:start` hook always runs, so the warning now fires every build.
 - `/how-this-site-was-built` page explaining the spec → plan → implement → test → review →
   docs delivery pipeline and its two human approval gates (plan approval, PR review before
   merge), with a table listing every spec in `docs/specs/` (number, title, status, and a link

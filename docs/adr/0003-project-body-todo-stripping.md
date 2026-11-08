@@ -190,9 +190,47 @@ three scenarios were exercised end-to-end against the real `content/projects/ats
    `astro build` immediately afterwards **without** clearing `.astro/` or `node_modules/.astro/` in
    between. Result: the build log still shows both `markdown-todo: omitted ...` warnings, and the
    built HTML still has no `TODO` text — the dev warm-up's cache entries did not leak un-stripped
-   HTML into the subsequent production build. No cache-busting fix was needed; the risk named in
-   amendment 8 did not materialize in practice for this codebase's actual usage pattern (every
-   markdown file is fully re-rendered through the still-synchronous `getRenderFunction`/`render`
-   call path on each `astro build`/`astro dev` invocation observed here, rather than silently
-   reusing a cross-command persisted `rendered.html`). If a future Astro version changes this
-   caching behaviour, re-run this same three-scenario check before assuming it still holds.
+   HTML into the subsequent production build. No cache-busting fix was needed for *this* specific
+   dev→build sequence.
+
+**Correction (2026-11-08, review 1): the three-scenario check above was incomplete.** It never
+exercised a **build → build again** sequence — two consecutive `astro build` runs, with no
+`astro dev` in between, against unchanged content and an already-warm cache from the first
+build. That is in fact the normal case (e.g. `make build` followed by `make e2e`, which depends
+on `build`), and it does trigger a real bug: Astro's content-layer glob loader
+(`node_modules/astro/dist/content/loaders/glob.js`, function `syncData`) compares each file's
+on-disk content digest against the digest already recorded in the content-layer cache, and
+**skips re-rendering entirely** — meaning it never calls `getRenderFunction`/`render`, and
+therefore never re-invokes the Sätteri plugin's `before` hook at all — whenever the digest is
+unchanged:
+
+```js
+const existingEntry = store.get(id);
+const digest = generateDigest(contents);
+if (existingEntry && existingEntry.digest === digest && existingEntry.filePath) {
+  // ...returns early, without ever calling render()...
+  return;
+}
+```
+
+This is correct for the *rendered HTML* (nothing changed, so the previously-cached, already
+correctly-stripped `entry.rendered` is reused as-is — the build output stays correct) but wrong
+for the `before` hook's `warn` side effect, which silently never fires on the second and all
+subsequent builds against that warm cache. Empirically confirmed: two `astro build` runs in a
+row, with the real `atsidek.md`/`payments-migration.md` TODO content and no cache clearing in
+between, produced the `markdown-todo: omitted ...` warning on neither run reliably — whichever
+run happened to see a cache miss warned, and the other did not, contradicting AC-5's "omitted
+and reported as warnings" (not "...the first time only").
+
+The earlier note above ("the risk named in amendment 8 did not materialize... every markdown
+file is fully re-rendered... on each `astro build`/`astro dev` invocation observed here") was
+wrong: it was true only for the dev→build sequence actually tested, not for the build→build
+case, which is a materially different cache-population path through the same digest check. The
+fix (see astro.config.mjs and `src/lib/markdown-todo.ts`'s `warnAboutTodoParagraphsInFiles`) is
+to stop relying on the Sätteri `before` hook for the warning at all: an `astro:build:start`
+integration hook — which Astro calls unconditionally, once per `astro build`, independent of
+content-layer cache state — now scans `content/projects/*.md` directly off disk and warns once
+per affected file itself. The Sätteri plugin keeps stripping the paragraphs from rendered HTML
+(still correct, cache hit or miss); only the warning responsibility moved. Verified empirically:
+two consecutive `astro build` runs against the unchanged real TODO fixtures now both print both
+files' warnings, every time.

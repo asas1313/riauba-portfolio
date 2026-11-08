@@ -240,14 +240,27 @@ entry's raw body, Astro has already rendered it to cached HTML — see
   a `before(root, context)` hook (run once per document, before Sätteri's own visitors) that
   removes each matching top-level paragraph via `context.removeNode(node)` (Sätteri's tree is
   read-only from plugin code; there is no `tree.children` array to reassign).
-- `astro.config.mjs` registers this via a small inline integration's `astro:config:setup` hook
-  (`markdown.processor: satteri({ mdastPlugins: [createSatteriTodoParagraphPlugin({ enabled:
-  command === "build", warn: console.warn }) ] })`), **not** a functional
+- `astro.config.mjs` registers the stripping via a small inline integration's `astro:config:setup`
+  hook (`markdown.processor: satteri({ mdastPlugins: [createSatteriTodoParagraphPlugin({ enabled:
+  command === "build", warn: () => {} }) ] })`), **not** a functional
   `defineConfig(({ command }) => ({ ... }))` default export — Astro's own `defineConfig` is a
   plain identity function and never calls a function passed as the config's default export
   (also confirmed empirically; see ADR-0003's Addendum). TODOs render as-is in `astro dev`, are
   stripped in `astro build`, mirroring `cv.publish.ts`'s `import.meta.env.PROD` gating via the
   config-time `command` equivalent.
+- **The build warning is emitted from a separate, cache-independent path, not from the Sätteri
+  plugin above.** Astro's content-layer glob loader skips re-rendering a file (and therefore
+  skips re-invoking the Sätteri plugin's `before` hook) whenever the file's on-disk content
+  digest is unchanged since the last sync — correct for reusing already-rendered HTML, but wrong
+  for a side-effecting warning: a second `astro build` in a row against an unchanged, warm
+  content-layer cache would otherwise never warn again, even though the (still correctly
+  stripped) output is unchanged. So `createSatteriTodoParagraphPlugin`'s own `warn` is wired as a
+  no-op in production, and the same integration also hooks `astro:build:start` — which Astro
+  calls unconditionally, once per `astro build`, before any content-layer sync happens — to call
+  `warnAboutTodoParagraphsInFiles`, which scans `content/projects/*.md` directly off disk (its own
+  dependency-free, text-level approximation of "top-level TODO paragraph", independent of mdast
+  or the content-layer cache entirely) and warns once per affected file. This fires on every
+  build, cold or warm cache alike; see ADR-0003's Addendum for the investigation.
 
 ### `src/content.config.ts`
 
