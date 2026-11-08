@@ -9,4 +9,4 @@
 | Review     | done    | 2          | Iter 1: CHANGES REQUESTED (2 SHOULD, 2 NIT) → fixed (d20fcc6). Iter 2: APPROVED, 1 trivial NIT (ADR status line) fixed directly by orchestrator (4540218). |
 | Docs       | done    | 1          | technical/index.md, user-guide/index.md, CHANGELOG.md (4a68fda); make docs strict build verified green via venv |
 | Final gate | done    | -          | test/lint/security/build/docs/e2e all green. Found+fixed: eslint didn't exclude generated site/ dir (7d22d73) |
-| PR         | running | -          | pushing branch and opening PR                                  |
+| PR         | done    | -          | https://github.com/asas1313/riauba-portfolio/pull/2            |
