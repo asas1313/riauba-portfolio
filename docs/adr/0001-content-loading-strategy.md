@@ -1,6 +1,6 @@
 # ADR-0001: Content loading strategy for cv.yaml and content/projects
 
-Status: Proposed · Date: 2026-11-08
+Status: Accepted · Date: 2026-11-08
 
 ## Context
 
