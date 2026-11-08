@@ -54,4 +54,21 @@ test.describe("home page performance and no-JS budget", () => {
 
     expect(totalBytes).toBeLessThan(MAX_TRANSFERRED_BYTES);
   });
+
+  test("makes zero requests to any third-party origin at all (not just script/fetch/xhr)", async ({
+    page,
+  }) => {
+    const requestedOrigins = new Set<string>();
+    page.on("request", (request) => {
+      requestedOrigins.add(new URL(request.url()).origin);
+    });
+
+    await page.goto("/", { waitUntil: "networkidle" });
+
+    expect(requestedOrigins.size).toBeGreaterThan(0);
+    const pageOrigin = new URL(page.url()).origin;
+    for (const origin of requestedOrigins) {
+      expect(origin).toBe(pageOrigin);
+    }
+  });
 });

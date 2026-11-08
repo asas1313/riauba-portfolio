@@ -16,4 +16,20 @@ test.describe("404 page", () => {
       page.getByRole("link", { name: /home|back/i }).first(),
     ).toHaveAttribute("href", "/");
   });
+
+  test("serves an HTTP 404 (not 200) for a deeply nested unknown path", async ({
+    page,
+  }) => {
+    const response = await page.goto("/foo/bar/baz/does-not-exist");
+    expect(response?.status()).toBe(404);
+    expect(response?.ok()).toBe(false);
+  });
+
+  test("serves the 404 page as HTML, not a bare status with no body", async ({
+    page,
+  }) => {
+    const response = await page.goto("/does-not-exist");
+    expect(response?.headers()["content-type"]).toContain("text/html");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
 });

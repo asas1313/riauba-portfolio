@@ -86,4 +86,65 @@ describe("getFeaturedProjectsSorted", () => {
       "payments-migration",
     ]);
   });
+
+  it("returns an empty array when the collection is empty (boundary)", () => {
+    expect(getFeaturedProjectsSorted([])).toEqual([]);
+  });
+
+  it("returns an empty array when no entry is featured (empty-state, AC-4)", () => {
+    const noneFeatured = entries.map((entry) => ({
+      ...entry,
+      data: { ...entry.data, featured: false },
+    }));
+    expect(getFeaturedProjectsSorted(noneFeatured)).toEqual([]);
+  });
+
+  it("does not throw and keeps a deterministic relative order for entries that tie on `order`", () => {
+    const tied = [
+      { id: "a", data: { ...baseData("A"), featured: true, order: 1 } },
+      { id: "b", data: { ...baseData("B"), featured: true, order: 1 } },
+    ];
+    const result = getFeaturedProjectsSorted(tied);
+    expect(result.map((entry) => entry.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("projectSchema (invalid input, AC-4 content validation)", () => {
+  it("rejects frontmatter missing the required title field", () => {
+    const withoutTitle = {
+      tagline: "tagline",
+      status: "live",
+      order: 0,
+      featured: false,
+      links: { live: null, docs: null, repo: null },
+      stack: [],
+    };
+    expect(() => projectSchema.parse(withoutTitle)).toThrow();
+  });
+
+  it("rejects frontmatter where `order` is a string instead of a number", () => {
+    const frontmatter = {
+      title: "x",
+      tagline: "tagline",
+      status: "live",
+      order: "1",
+      featured: false,
+      links: { live: null, docs: null, repo: null },
+      stack: [],
+    };
+    expect(() => projectSchema.parse(frontmatter)).toThrow();
+  });
+
+  it("rejects frontmatter where `featured` is not a boolean", () => {
+    const frontmatter = {
+      title: "x",
+      tagline: "tagline",
+      status: "live",
+      order: 0,
+      featured: "true",
+      links: { live: null, docs: null, repo: null },
+      stack: [],
+    };
+    expect(() => projectSchema.parse(frontmatter)).toThrow();
+  });
 });

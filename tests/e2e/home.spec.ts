@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { readCv, readFeaturedProjectsSorted } from "./helpers/content.ts";
+import {
+  readCv,
+  readFeaturedProjectsSorted,
+  readProjects,
+} from "./helpers/content.ts";
 
 const cv = readCv();
 const featuredProjects = readFeaturedProjectsSorted();
@@ -52,6 +56,24 @@ test.describe("home page", () => {
         `/projects/${featuredProjects[i].id}`,
       );
       await expect(links.nth(i)).toContainText(featuredProjects[i].title);
+    }
+  });
+
+  test("never links to a non-featured project (empty-state exclusion, AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const allProjects = readProjects();
+    const nonFeatured = allProjects.filter((project) => !project.featured);
+    // Sanity check on the fixture itself: this only proves something if
+    // content/projects actually contains at least one non-featured project.
+    expect(nonFeatured.length).toBeGreaterThan(0);
+    for (const project of nonFeatured) {
+      await expect(
+        page.locator(
+          `[data-testid='project-link'][href="/projects/${project.id}"]`,
+        ),
+      ).toHaveCount(0);
     }
   });
 });
