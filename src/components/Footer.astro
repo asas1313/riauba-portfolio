@@ -1,0 +1,23 @@
+---
+import { cv, getVisibleProfiles } from "../lib/cv.ts";
+
+const year = new Date().getFullYear();
+const linkedIn = getVisibleProfiles(cv.basics.profiles).find(
+  (profile) => profile.network.trim().toLowerCase() === "linkedin",
+);
+---
+
+<footer class="site-footer">
+  <p>
+    <a href={`mailto:${cv.basics.email}`}>{cv.basics.email}</a>
+    {linkedIn && (
+      <>
+        {" "}
+        · <a href={linkedIn.url}>LinkedIn</a>
+      </>
+    )}
+  </p>
+  <p>
+    © {year} {cv.basics.name}
+  </p>
+</footer>
