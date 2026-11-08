@@ -32,6 +32,16 @@ test.describe("home page", () => {
     }
   });
 
+  test("shows a Download CV (PDF) link in the header nav, pointing at /andrius-riauba-cv.pdf (AC-5)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const navLink = page
+      .locator("header nav")
+      .getByRole("link", { name: "Download CV (PDF)" });
+    await expect(navLink).toHaveAttribute("href", "/andrius-riauba-cv.pdf");
+  });
+
   test("hides profiles marked TODO", async ({ page }) => {
     await page.goto("/");
     const todoProfiles = cv.basics.profiles.filter(

@@ -28,13 +28,39 @@ export interface CvBasics {
   [key: string]: unknown;
 }
 
+export interface Work {
+  name: string;
+  position: string;
+  startDate: string;
+  endDate?: string;
+  url?: string;
+  summary: string;
+  highlights: string[];
+}
+
 export interface Cv {
   basics: CvBasics;
+  work: Work[];
   [key: string]: unknown;
 }
 
 export function readCv(): Cv {
   return parseYaml(readFileSync(cvPath, "utf-8")) as Cv;
+}
+
+// Mirrors src/lib/cv.ts's getWorkReverseChronological. Duplicated rather
+// than imported: e2e spec files run under Node's own ESM loader, not Vite,
+// so they cannot import src/lib/cv.ts (see the comment above readCv).
+const ONGOING_SENTINEL = "9999-99";
+
+export function readWorkReverseChronological(): Work[] {
+  const work = readCv().work;
+  return [...work].sort((a, b) => {
+    const aEnd = a.endDate ?? ONGOING_SENTINEL;
+    const bEnd = b.endDate ?? ONGOING_SENTINEL;
+    if (aEnd !== bEnd) return bEnd.localeCompare(aEnd);
+    return b.startDate.localeCompare(a.startDate);
+  });
 }
 
 const projectsDir = fileURLToPath(
