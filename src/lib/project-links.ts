@@ -12,6 +12,12 @@ export interface VisibleProjectLink {
   kind: ProjectLinkKind;
   label: string;
   url: string;
+  /** True for exactly the single highest-priority (live > docs > repo)
+   * present link; false for every other present link. Spec 005, decision
+   * 4: button-style assignment is by link *type*, not DOM position -- a
+   * project missing `live` still gets a primary button, just on `docs`
+   * (or `repo` if `docs` is also absent/TODO) instead. */
+  isPrimary: boolean;
 }
 
 const LINK_ORDER: { kind: ProjectLinkKind; label: string }[] = [
@@ -27,13 +33,19 @@ const LINK_ORDER: { kind: ProjectLinkKind; label: string }[] = [
  * unconditional — identical in `astro dev` and `astro build` — since a
  * link button that literally reads "TODO" would otherwise be visible
  * (and clickable, pointing nowhere useful) in local development.
+ *
+ * The first entry in the returned array (if any) is always `isPrimary`:
+ * since `LINK_ORDER` is itself priority order and this filter preserves
+ * that order, the first *surviving* entry is always the highest-priority
+ * present link, whichever kind it actually is.
  */
 export function getVisibleProjectLinks(
   links: ProjectLinks,
 ): VisibleProjectLink[] {
-  return LINK_ORDER.flatMap(({ kind, label }) => {
+  const visible = LINK_ORDER.flatMap(({ kind, label }) => {
     const url = links[kind];
     if (url === null || isTodoMarked(url)) return [];
     return [{ kind, label, url }];
   });
+  return visible.map((link, index) => ({ ...link, isPrimary: index === 0 }));
 }

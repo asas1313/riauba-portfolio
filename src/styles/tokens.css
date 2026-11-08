@@ -1,0 +1,111 @@
+/* Design tokens (spec 005). Plain CSS custom properties -- no Tailwind, no
+   CSS-in-JS build step. This file is the ONLY place colour literals (hex,
+   rgb/rgba/hsl/oklch) may appear in the codebase. Every other CSS file
+   under src/styles/, and every inline <style> block in any Astro
+   component, must reference colours exclusively via var(--color-...);
+   tests/unit/no-hardcoded-colors.test.ts enforces this mechanically.
+
+   Theme resolution order (low to high specificity-equal precedence, by
+   source order):
+     1. :root (light defaults)
+     2. @media (prefers-color-scheme: dark) (system preference)
+     3. [data-theme="light"] / [data-theme="dark"] (manual override, set by
+        the inline scripts in BaseLayout.astro/Header.astro -- always wins
+        over the system preference because it is declared last). */
+
+@font-face {
+  /* Self-hosted JetBrains Mono (OFL-1.1), weight 400, latin + latin-ext,
+     properly subset with fonttools/pyftsubset from the genuine upstream
+     Regular TTF (~14.6 KB latin / ~11.3 KB latin-ext as WOFF2). Deliberately
+     NOT preloaded (task 10) -- zero bytes requested on any page without
+     `code`/`pre`. See THIRD_PARTY_NOTICES.md. */
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-latin-ext-400.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Light theme (default). --color-accent stays exactly #1d4ed8 (spec 005,
+     decision 3) -- never change this value without an explicit decision. */
+  --color-bg: #ffffff;
+  --color-bg-elevated: #f3f5f8;
+  --color-text: #0b1220;
+  --color-text-muted: #3f4b5e;
+  --color-accent: #1d4ed8;
+  --color-border: #d9dee6;
+  --color-focus-ring: #1d4ed8;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* Reading measure for body prose (task 7) -- ~65-75 characters,
+     expressed in `ch` so it tracks the actual font rather than a fixed
+     px/rem value. */
+  --content-width: 68ch;
+  /* Separate, wider cap for the header/footer chrome row (site name, nav,
+     theme toggle / footer links): at 68ch the full 5-item nav plus the
+     site name and toggle button do not fit on one row even at a 1280px
+     viewport, which would wrap the nav prematurely and fail AC-4's "nav
+     inline at 1280px" requirement. Chrome is not reading prose, so it is
+     not bound by the same measure. */
+  --layout-width: 60rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0b1220;
+    --color-bg-elevated: #141c2b;
+    --color-text: #e5e7eb;
+    --color-text-muted: #a9b4c4;
+    /* Distinct, lighter-tuned variant of the light theme's #1d4ed8 -- never
+       the same literal value reused on a dark background (spec 005,
+       decision 3). Tuned for AA contrast against --color-bg (task 13). */
+    --color-accent: #7fb0ff;
+    --color-border: #2a3444;
+    --color-focus-ring: #7fb0ff;
+  }
+}
+
+/* Manual override via [data-theme], declared after the media query above so
+   a deliberate choice always wins over the system preference at equal
+   specificity (source order), without needing !important anywhere. */
+[data-theme="light"] {
+  --color-bg: #ffffff;
+  --color-bg-elevated: #f3f5f8;
+  --color-text: #0b1220;
+  --color-text-muted: #3f4b5e;
+  --color-accent: #1d4ed8;
+  --color-border: #d9dee6;
+  --color-focus-ring: #1d4ed8;
+}
+
+[data-theme="dark"] {
+  --color-bg: #0b1220;
+  --color-bg-elevated: #141c2b;
+  --color-text: #e5e7eb;
+  --color-text-muted: #a9b4c4;
+  --color-accent: #7fb0ff;
+  --color-border: #2a3444;
+  --color-focus-ring: #7fb0ff;
+}

@@ -1,4 +1,4 @@
-# 005 — Visual design (professional theme)
+# 005 – Visual design (professional theme)
 
 Status: Draft
 

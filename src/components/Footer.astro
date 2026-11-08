@@ -5,6 +5,9 @@ const year = new Date().getFullYear();
 const linkedIn = cvForBuild.basics.profiles.find(
   (profile) => profile.network.trim().toLowerCase() === "linkedin",
 );
+const github = cvForBuild.basics.profiles.find(
+  (profile) => profile.network.trim().toLowerCase() === "github",
+);
 ---
 
 <footer class="site-footer">
@@ -14,6 +17,12 @@ const linkedIn = cvForBuild.basics.profiles.find(
       <>
         {" "}
         · <a href={linkedIn.url}>LinkedIn</a>
+      </>
+    )}
+    {github && (
+      <>
+        {" "}
+        · <a href={github.url}>GitHub</a>
       </>
     )}
   </p>

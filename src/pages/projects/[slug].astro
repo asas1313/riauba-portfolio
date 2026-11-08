@@ -42,7 +42,10 @@ const visibleLinks = getVisibleProjectLinks(project.data.links);
   {visibleLinks.length > 0 && (
     <p class="project-links">
       {visibleLinks.map((link) => (
-        <a class="project-link-button" href={link.url}>
+        <a
+          class={link.isPrimary ? "project-link-button" : "button-secondary"}
+          href={link.url}
+        >
           {link.label}
         </a>
       ))}
