@@ -1,0 +1,16 @@
+---
+import type { CollectionEntry } from "astro:content";
+
+interface Props {
+  project: Pick<CollectionEntry<"projects">, "id" | "data">;
+}
+
+const { project } = Astro.props;
+---
+
+<li>
+  <a data-testid="project-link" href={`/projects/${project.id}`}>
+    {project.data.title}
+  </a>
+  <p>{project.data.tagline}</p>
+</li>

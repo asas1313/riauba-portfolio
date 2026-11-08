@@ -1,9 +1,37 @@
 ---
-// Placeholder home-page content. Real content-driven markup lands in task 9;
-// this task only proves BaseLayout/Header/Footer wiring (AC-5).
+import { getCollection } from "astro:content";
 import BaseLayout from "../components/BaseLayout.astro";
+import ProjectCard from "../components/ProjectCard.astro";
+import { cv, getVisibleProfiles } from "../lib/cv.ts";
+import { getFeaturedProjectsSorted } from "../lib/projects.ts";
+
+const visibleProfiles = getVisibleProfiles(cv.basics.profiles);
+const allProjects = await getCollection("projects");
+const featuredProjects = getFeaturedProjectsSorted(allProjects);
 ---
 
-<BaseLayout title="riauba.org" description="Placeholder home page." path="/">
-  <h1>hello world</h1>
+<BaseLayout
+  title={`${cv.basics.name} — ${cv.basics.label}`}
+  description={cv.basics.summary.trim()}
+  path="/"
+>
+  <h1>{cv.basics.name}</h1>
+  <p>{cv.basics.label}</p>
+  <p>{cv.basics.summary}</p>
+  <p>{cv.basics.remote}</p>
+
+  <ul>
+    {visibleProfiles.map((profile) => (
+      <li>
+        <a href={profile.url}>{profile.network}</a>
+      </li>
+    ))}
+  </ul>
+
+  <h2>Featured projects</h2>
+  <ul>
+    {featuredProjects.map((project) => (
+      <ProjectCard project={project} />
+    ))}
+  </ul>
 </BaseLayout>
