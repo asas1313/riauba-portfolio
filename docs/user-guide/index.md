@@ -8,11 +8,9 @@ Everything on the site today comes from two places in the repository:
 - `content/projects/*.md` — one file per project shown on the home page.
 
 !!! note "What's live today"
-    Right now the site has a home page, a full CV page with a downloadable PDF, and a styled
-    404 page. The project detail pages and the "How this site was built" page are planned but
-    not built yet — the menu still links to them, so clicking those two links currently shows
-    the 404 page below. This guide covers both the home page and the CV page: both read their
-    content from `content/cv.yaml`, so there's nothing CV-specific to author beyond that file.
+    The site has a home page, a full CV page with a downloadable PDF, a projects catalogue with
+    tag filtering, a project detail page per project, a "How this site was built" page, and a
+    styled 404 page.
 
 ## How to update the home page content
 
@@ -116,14 +114,23 @@ engines never treat it as a separate page. It exists purely as the exact page th
 build prints; the content on it is identical to `/cv`, just without the surrounding site
 chrome.
 
+## How this site was built
+
+The "How this site was built" page (linked from the header) is a short, factual explanation of
+the spec → plan → implement → test → review → docs process used to build this site, with a
+table listing every spec (number, title, status, and a link to its merged pull request where
+one exists). There's nothing to author here yourself — it's generated from `docs/specs/` at
+build time, not from `content/`.
+
 ## How to add a new project
 
-Featured projects appear on the home page, each linking to a project page (not built yet — see
-the note at the top of this guide). To add a new project:
+Featured projects (`featured: true`) appear on the home page. Every project, featured or not,
+appears on the `/projects` catalogue page (linked from the header as "Projects") and gets its
+own `/projects/<slug>` detail page. To add a new project:
 
 1. Create a new file in `content/projects/`, named after the project using lowercase letters
    and hyphens, e.g. `content/projects/my-new-project.md`. This filename becomes the project's
-   URL slug.
+   URL slug (so this example would be reachable at `/projects/my-new-project`).
 2. Give it frontmatter like this (copy an existing file in that folder as a starting point,
    e.g. `content/projects/atsidek.md`):
 
@@ -141,31 +148,51 @@ the note at the top of this guide). To add a new project:
    ```
 
    Field notes:
-   - `title` — the project name shown on the home page.
+   - `title` — the project name shown everywhere the project appears.
    - `tagline` — the one-line description shown under the title.
-   - `status` — a free-text status word; the existing projects use `"live"`, `"active"` and
-     `"case-study"`, but any short word works.
-   - `order` — a number controlling where it appears among featured projects (lower numbers
-     first).
-   - `featured` — set to `true` to show it on the home page, `false` to keep it in the repo
-     without publishing it there yet.
-   - `links` — set `live`, `docs` and/or `repo` to a URL, or leave as `null` if there isn't one
-     yet.
-   - `stack` — a list of technology names shown as tags.
-3. Save the file and rebuild (`make build`). No code changes are needed — any `.md` file in
+   - `status` — a free-text status word, shown as a badge; the existing projects use `"live"`,
+     `"active"` and `"case-study"`, but any short word works — there's no fixed list, and every
+     status gets the same badge style.
+   - `order` — a number controlling where it appears, both among featured projects on the home
+     page and in the full `/projects` list (lower numbers first).
+   - `featured` — set to `true` to also show it on the home page, `false` to keep it out of the
+     home page (it still appears on `/projects`).
+   - `links` — set `live`, `docs` and/or `repo` to a URL to show a button for that link on the
+     project's detail page, or leave as `null` (or the placeholder `"TODO"`) to hide that
+     button. Hiding a `TODO` link button happens immediately, in both `make build` and the dev
+     server — unlike the body-text rule below, there's no "only in production" exception for
+     link buttons.
+   - `stack` — a list of technology names. Each one is shown as a tag linking to
+     `/projects/tag/<tag>`, a page listing every project that shares that tag — this needs no
+     JavaScript, it's a plain static page per tag. Two different tag spellings that would end
+     up looking the same in a URL (e.g. differing only in punctuation) make the build fail with
+     a clear error naming both — rename one of them so they're distinguishable.
+3. Below the frontmatter, write the project's description in normal markdown — paragraphs,
+   lists, links, whatever you need. This becomes the body of the project's `/projects/<slug>`
+   page.
+4. Save the file and rebuild (`make build`). No code changes are needed — any `.md` file in
    `content/projects/` with valid frontmatter is picked up automatically.
 
 If the frontmatter is missing a required field or has the wrong type (e.g. `order` written as
 text instead of a number), the build fails with a clear error naming the problem, the same way
 it does for `cv.yaml`.
 
+### Leaving a TODO note in a project's body text
+
+The same `TODO` placeholder convention from `cv.yaml` (see ["How the TODO placeholder rule
+works"](#how-the-todo-placeholder-rule-works) above) also applies to a **whole paragraph** in a
+project's markdown body: write a paragraph starting with the word `TODO` (e.g. `TODO (Andrius):
+fill in the hardest technical problem here.`) as a placeholder reminder for yourself, and it is
+automatically left out of the published page — only in a production build (`make build` /
+`make e2e`, and the live site); it renders exactly as written in the dev server (`npm run dev`),
+so you can still see your own reminder locally. Only a paragraph whose text *starts with* `TODO`
+is removed this way; a paragraph that merely mentions "TODO" partway through stays published.
+This check only looks at top-level paragraphs, not text inside a bullet list or a blockquote —
+put reminders in their own paragraph, not inside a list item.
+
 ## The 404 page
 
-If you (or a visitor) follow a broken or not-yet-built link, the site shows a styled "page not
-found" message with a link back to the home page, instead of a blank browser error:
+If you (or a visitor) follow a broken link, the site shows a styled "page not found" message
+with a link back to the home page, instead of a blank browser error:
 
 ![404 page](img/404-page.png)
-
-This is what you'll currently see for the Projects and "How this site was built" menu links,
-since those pages haven't been built yet. (The CV link is live — see ["The CV page and
-PDF"](#the-cv-page-and-pdf) above.)

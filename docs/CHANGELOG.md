@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Added (spec 003 — projects catalogue and detail pages)
+
+- `/projects` catalogue page listing every project (not just featured ones) from
+  `content/projects/*.md`, sorted by `order`, each with a status badge and stack tags.
+- Static `/projects/tag/<tag>` filter pages, one per distinct stack tag, generated at build
+  time — filtering needs zero client-side JavaScript. Two distinct tag labels that would
+  collide on the same URL slug (or a label with no usable slug at all) fail the build with a
+  readable error instead of silently merging.
+- `/projects/<slug>` detail pages rendering each project's markdown body, plus a link button
+  per `live`/`docs`/`repo` entry — hidden (in both dev and production) when that link is `null`
+  or the literal placeholder `"TODO"`.
+- Markdown body paragraphs starting with `TODO` are omitted from project detail pages in
+  production builds, with a build warning naming the file and count — the same `TODO` marker
+  and whole-word/case-sensitive rule as spec 002's CV field stripping, implemented separately
+  for markdown ASTs (`src/lib/markdown-todo.ts`) since the two operate on different data shapes
+  at different times. See ADR-0003 for the full design, including two deviations discovered
+  while implementing it: Astro 7.4 ships Sätteri, not the classic remark/unified pipeline, as
+  its default Markdown processor (so the plugin targets Sätteri's native API instead of
+  `markdown.remarkPlugins`), and Astro's `defineConfig` doesn't support a functional/callback
+  form (so the production/dev gating is wired through a small inline integration instead).
+- `/how-this-site-was-built` page explaining the spec → plan → implement → test → review →
+  docs delivery pipeline and its two human approval gates (plan approval, PR review before
+  merge), with a table listing every spec in `docs/specs/` (number, title, status, and a link
+  to its merged pull request when a `PR: <url>` line is present in that spec's file).
+  `docs/specs/001-site-foundation.md` and `docs/specs/002-cv-page-and-pdf.md` are retrofitted
+  with their own `PR:` lines.
+- `src/lib/todo.ts`, extracted from `cv.publish.ts`, shared by the new `project-links.ts`'s
+  link-button filter.
+- `ProjectCard.astro` gains a status badge and stack-tag links, reused by the home page,
+  `/projects` and `/projects/tag/<tag>`.
+
 ### Added (spec 001 — site foundation and home page)
 
 - Astro 7 static site (`output: "static"`, TypeScript strict, plain CSS, zero client-side
