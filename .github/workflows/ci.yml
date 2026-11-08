@@ -31,6 +31,17 @@ jobs:
     # baseline comparisons happen in the same reproducible rendering
     # environment on every run, never the bare `ubuntu-latest` image's own
     # font stack.
+    #
+    # TEMPORARY, remove before relying on this gate: no baseline PNGs are
+    # committed yet under tests/visual/pages.spec.ts-snapshots/ (they can
+    # only be generated inside this same pinned image, via
+    # `make visual-update`, by someone with local Docker access -- neither
+    # the implementing nor the testing session for spec 005 had it).
+    # Without `continue-on-error`, this job fails on every run with a
+    # missing-baseline error, not a real regression. Once baselines are
+    # generated and committed, delete this `continue-on-error` line so the
+    # job becomes a real blocking gate again, per AC-11's intent.
+    continue-on-error: true
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.65.0-noble
