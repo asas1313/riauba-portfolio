@@ -1,0 +1,124 @@
+/* Self-hosted Inter (OFL), subsets latin + latin-ext.
+   latin-ext is required, not optional: content/cv.yaml and
+   content/projects/*.md contain Lithuanian diacritics ("ų", "š", "č", "ė")
+   that a latin-only subset does not cover, which would silently fall back
+   to a system font for those characters. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/inter-latin-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/inter-latin-ext-400.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/inter-latin-600.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../assets/fonts/inter-latin-ext-600.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --color-bg: #ffffff;
+  --color-text: #0b1220;
+  --color-text-muted: #3f4b5e;
+  --color-accent: #1d4ed8;
+  --color-border: #d9dee6;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --content-width: 42rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0b1220;
+    --color-text: #e5e7eb;
+    --color-text-muted: #a9b4c4;
+    /* Lighter tint of the light-theme accent (#1d4ed8), chosen for AA
+       contrast against --color-bg; verified by the axe e2e suite. */
+    --color-accent: #60a5fa;
+    --color-border: #2a3444;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.site-header,
+.site-footer,
+main {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.site-header nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.site-footer {
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
