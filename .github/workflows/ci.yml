@@ -23,3 +23,33 @@ jobs:
       - run: make security
       - run: make docs
       - run: make e2e
+  visual:
+    # Spec 005, AC-8/AC-11; see ADR-0004. Runs entirely inside the pinned
+    # Playwright Docker image via GitHub Actions' native `container:` key
+    # (no self-hosted Docker daemon or `docker run` wrapper needed here,
+    # unlike the local `make visual`/`make visual-update` targets) so
+    # baseline comparisons happen in the same reproducible rendering
+    # environment on every run, never the bare `ubuntu-latest` image's own
+    # font stack.
+    #
+    # TEMPORARY, remove before relying on this gate: no baseline PNGs are
+    # committed yet under tests/visual/pages.spec.ts-snapshots/ (they can
+    # only be generated inside this same pinned image, via
+    # `make visual-update`, by someone with local Docker access -- neither
+    # the implementing nor the testing session for spec 005 had it).
+    # Without `continue-on-error`, this job fails on every run with a
+    # missing-baseline error, not a real regression. Once baselines are
+    # generated and committed, delete this `continue-on-error` line so the
+    # job becomes a real blocking gate again, per AC-11's intent.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build:pdf
+      - run: npx playwright test --config=playwright.visual.config.ts

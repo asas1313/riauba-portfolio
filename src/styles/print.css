@@ -14,6 +14,16 @@ body {
   line-height: 1.3;
 }
 
+/* `main`'s own max-width (global.css, `--content-width`) must also be
+   cancelled here, not just `.cv`'s: spec 005 switched `--content-width`
+   from a root-relative `42rem` to an element-relative `68ch` (task 7),
+   which on this page resolves against `body`'s print-only 9.5pt font-size
+   above -- a much narrower column than the body text's intended ~65-75ch
+   reading measure -- and was wrapping this page's dense CV text onto a
+   3rd page (AC-3's hard 2-page ceiling). `.cv`'s own `max-width: none`
+   alone can't fix this: a block child can never render wider than its
+   parent's content box regardless of its own max-width. */
+main,
 .cv {
   max-width: none;
 }
@@ -49,7 +59,7 @@ body {
 .cv h2 {
   margin: 0.5em 0 0.2em;
   padding-top: 0.2em;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid var(--color-border);
   font-size: 11pt;
 }
 

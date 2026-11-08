@@ -4,6 +4,11 @@ import { toSafeJsonLd } from "../lib/structured-data.ts";
 import Header from "./Header.astro";
 import Footer from "./Footer.astro";
 import "../styles/global.css";
+// Imported (not hard-coded) so the preload `href`s below always match the
+// content-hashed filenames Vite actually emits for these two assets --
+// the same files global.css's @font-face `url(...)` rules reference.
+import interLatin400 from "../assets/fonts/inter-latin-400.woff2";
+import interLatinExt400 from "../assets/fonts/inter-latin-ext-400.woff2";
 
 interface Props {
   title: string;
@@ -24,6 +29,29 @@ const seo = buildPageSeo(Astro.site ?? new URL("https://riauba.org/"), {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script is:inline>
+      // Flash-free manual theme override (spec 005, task 3). Runs
+      // synchronously, before any stylesheet paints, so a stored manual
+      // choice wins over the `prefers-color-scheme` media query from the
+      // very first frame. No fallback logic needed here when nothing is
+      // stored -- tokens.css's `@media (prefers-color-scheme: dark)` block
+      // already handles that case on its own.
+      //
+      // NOTE for any future Content-Security-Policy: this inline script
+      // (and Header.astro's theme-toggle script) will need a `sha256-`
+      // hash or nonce in `script-src` if a CSP is ever added --
+      // `unsafe-inline` would defeat the point of adding one.
+      try {
+        const storedTheme = localStorage.getItem("theme");
+        if (storedTheme === "light" || storedTheme === "dark") {
+          document.documentElement.dataset.theme = storedTheme;
+          document.documentElement.style.colorScheme = storedTheme;
+        }
+      } catch {
+        // localStorage inaccessible (private browsing / storage disabled):
+        // fall back to the prefers-color-scheme media query only.
+      }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{seo.title}</title>
     <meta name="description" content={seo.description} />
@@ -33,6 +61,25 @@ const seo = buildPageSeo(Astro.site ?? new URL("https://riauba.org/"), {
     <meta property="og:type" content={seo.og.type} />
     <meta property="og:url" content={seo.og.url} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Preload only the above-the-fold body text font (Inter 400, both
+         subsets): Inter 600 (headings) and the mono font are deliberately
+         NOT preloaded here (spec 005, AC-5/task 10) -- neither is needed
+         for first paint on every page, and the mono font costs zero bytes
+         on any page without `code`/`pre`. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href={interLatin400}
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href={interLatinExt400}
+      crossorigin
+    />
     {structuredData !== undefined && (
       <script
         type="application/ld+json"
@@ -41,8 +88,11 @@ const seo = buildPageSeo(Astro.site ?? new URL("https://riauba.org/"), {
     )}
   </head>
   <body>
+    <a class="skip-link" href="#main-content">
+      Skip to content
+    </a>
     <Header />
-    <main>
+    <main id="main-content">
       <slot />
     </main>
     <Footer />

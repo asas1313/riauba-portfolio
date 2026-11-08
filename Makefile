@@ -1,4 +1,10 @@
-.PHONY: setup test e2e screenshots lint lint-changed format format-file security docs build deploy smoke
+.PHONY: setup test e2e screenshots lint lint-changed format format-file security docs build deploy smoke visual visual-update
+
+# Playwright Docker image pinned to the exact @playwright/test version in
+# package-lock.json (tests/unit/playwright-docker-version.test.ts enforces
+# this matches). Must stay in lockstep with .github/workflows/ci.yml's
+# visual job and with @playwright/test's version in package.json.
+PLAYWRIGHT_DOCKER_IMAGE := mcr.microsoft.com/playwright:v1.65.0-noble
 
 setup:
 	npm ci
@@ -15,6 +21,30 @@ e2e: build
 # someone deliberately asks for it.
 screenshots: build
 	npm run capture-screenshots
+
+# Visual-regression suite (spec 005, AC-8/AC-11; see ADR-0004). Asserts
+# against committed baselines under tests/visual/pages.spec.ts-snapshots/.
+# Runs *inside* the pinned Playwright Docker image, never on the bare
+# host, so font rendering is identical to CI regardless of the
+# contributor's own OS. `--user $(id -u):$(id -g)` keeps any
+# generated/updated snapshot files owned by the host user, not root;
+# `--ipc=host` is Playwright's documented requirement to avoid Chromium
+# crashing under Docker's default shared-memory limits. Requires Docker
+# locally (not installed by `make setup`).
+visual: build
+	docker run --rm --user $$(id -u):$$(id -g) --ipc=host \
+		-v "$$PWD:/work" -w /work $(PLAYWRIGHT_DOCKER_IMAGE) \
+		npx playwright test --config=playwright.visual.config.ts
+
+# Explicit, opt-in regeneration of tests/visual/pages.spec.ts-snapshots/
+# baselines. The *only* supported way to change a baseline PNG -- a
+# bare-host run would silently commit host-specific rendering artefacts
+# (mirrors the existing `screenshots` target's "explicit opt-in,
+# overwrites tracked files" convention).
+visual-update: build
+	docker run --rm --user $$(id -u):$$(id -g) --ipc=host \
+		-v "$$PWD:/work" -w /work $(PLAYWRIGHT_DOCKER_IMAGE) \
+		npx playwright test --config=playwright.visual.config.ts --update-snapshots
 
 lint:
 	npx astro check && npx eslint . && npx prettier --check .

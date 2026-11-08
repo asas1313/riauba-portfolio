@@ -23,6 +23,15 @@ test.describe("/cv page", () => {
     }
   });
 
+  // Spec 005, AC-6: Lithuanian characters render in the self-hosted font
+  // (latin-ext subset), not as tofu/a system-font fallback.
+  test('renders Lithuanian characters ("Registrų Centras")', async ({
+    page,
+  }) => {
+    await page.goto("/cv");
+    await expect(page.getByText("Registrų Centras")).toBeVisible();
+  });
+
   test("shows skills, education and languages sections", async ({ page }) => {
     await page.goto("/cv");
     await expect(page.getByRole("heading", { name: "Skills" })).toBeVisible();

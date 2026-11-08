@@ -10,7 +10,9 @@ Everything on the site today comes from two places in the repository:
 !!! note "What's live today"
     The site has a home page, a full CV page with a downloadable PDF, a projects catalogue with
     tag filtering, a project detail page per project, a "How this site was built" page, and a
-    styled 404 page.
+    styled 404 page — all in a professional light/dark theme with a toggle in the header (see
+    ["How to switch between light and dark mode"](#how-to-switch-between-light-and-dark-mode)
+    below).
 
 ## How to update the home page content
 
@@ -205,6 +207,29 @@ so you can still see your own reminder locally. Only a paragraph whose text *sta
 is removed this way; a paragraph that merely mentions "TODO" partway through stays published.
 This check only looks at top-level paragraphs, not text inside a bullet list or a blockquote —
 put reminders in their own paragraph, not inside a list item.
+
+## How to switch between light and dark mode
+
+Every page has a small sun/moon toggle button in the header, next to the navigation links.
+Click it to switch between light and dark mode — the whole page repaints immediately, no
+reload needed.
+
+Your choice is remembered: it's saved in your browser's `localStorage`, so the next time you
+visit (even in a new tab or after closing the browser), the site opens in the mode you last
+chose. If you've never clicked the toggle, the site instead follows your operating system's
+light/dark setting automatically, and keeps following it live if you change that OS setting
+while the page is open.
+
+!!! note "For contributors: updating the visual-regression screenshots"
+    Separately from the `docs/user-guide/img/*.png` screenshots shown throughout this guide,
+    the project also keeps a set of pixel-comparison "baseline" screenshots
+    (`tests/visual/pages.spec.ts-snapshots/`) used to catch accidental visual regressions.
+    These must only ever be generated with `make visual-update`, which runs inside a
+    version-pinned Docker image — never by running the test suite directly on your own
+    machine. A baseline generated on a bare host renders fonts slightly differently from one
+    machine to the next and would produce false failures for everyone else. See
+    [Styling and fonts](../technical/index.md#styling-and-fonts-spec-005-visual-design) in the
+    technical docs for details, including the current status of this suite in CI.
 
 ## The 404 page
 

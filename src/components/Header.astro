@@ -6,16 +6,118 @@ const navItems = [
   { href: "/how-this-site-was-built", label: "How this site was built" },
   { href: "/andrius-riauba-cv.pdf", label: "Download CV (PDF)" },
 ];
+
+// Astro.url.pathname carries a trailing slash for statically-generated
+// routes (e.g. "/cv/"), unlike this component's own un-slashed `navItems`
+// hrefs -- strip it (except for the root "/" itself) before comparing.
+const currentPath = Astro.url.pathname.replace(/(?!^)\/$/, "");
 ---
 
 <header class="site-header">
+  <a class="site-name" href="/">
+    Andrius Riauba
+  </a>
   <nav aria-label="Primary">
     <ul>
       {navItems.map((item) => (
         <li>
-          <a href={item.href}>{item.label}</a>
+          <a
+            href={item.href}
+            class={item.href === currentPath ? "active" : undefined}
+            aria-current={item.href === currentPath ? "page" : undefined}
+          >
+            {item.label}
+          </a>
         </li>
       ))}
     </ul>
   </nav>
+  <button
+    type="button"
+    class="theme-toggle"
+    hidden
+    aria-pressed="false"
+    aria-label="Toggle colour theme"
+  >
+    <svg
+      class="theme-toggle-icon-light"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+    </svg>
+    <svg
+      class="theme-toggle-icon-dark"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M20.742 13.045a8.088 8.088 0 0 1-2.077.273c-4.508 0-8.168-3.66-8.168-8.168 0-.73.098-1.436.277-2.112A1 1 0 0 0 9.46 1.904 10.089 10.089 0 1 0 22.07 14.512a1 1 0 0 0-1.328-1.467z"></path>
+    </svg>
+  </button>
 </header>
+
+<script is:inline>
+  // The only other client-side script shipped on the site (spec 005, task
+  // 4) alongside BaseLayout.astro's head script. Loaded on every page
+  // (Header is universal). See BaseLayout.astro's head script for the CSP
+  // note that applies equally here.
+  (function () {
+    const toggle = document.querySelector(".theme-toggle");
+    if (!toggle) return;
+
+    function storeTheme(value) {
+      try {
+        localStorage.setItem("theme", value);
+      } catch {
+        // Storage disabled/unavailable (e.g. private browsing): the
+        // choice simply won't persist across reloads this session.
+      }
+    }
+
+    function currentEffectiveTheme() {
+      const stored = document.documentElement.dataset.theme;
+      if (stored === "light" || stored === "dark") return stored;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    }
+
+    function updateButton(theme) {
+      toggle.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+      updateButton(theme);
+    }
+
+    // On load, only reflect the current effective theme on the button
+    // itself (aria-pressed/icon) -- never call applyTheme() here. Doing so
+    // would pin dataset.theme/style.colorScheme on every page view, even
+    // for a visitor who never touched the toggle and has nothing stored,
+    // freezing the system preference and breaking live
+    // prefers-color-scheme repaints for the rest of that page view.
+    // BaseLayout.astro's head script already set dataset.theme before this
+    // script ever runs *if and only if* an explicit choice was previously
+    // stored -- when it wasn't, dataset.theme/style.colorScheme must stay
+    // untouched so the CSS media query alone keeps driving the theme.
+    updateButton(currentEffectiveTheme());
+
+    toggle.addEventListener("click", function () {
+      const next = currentEffectiveTheme() === "dark" ? "light" : "dark";
+      applyTheme(next);
+      storeTheme(next);
+    });
+
+    // Reveal the button only now that its listener is attached -- it must
+    // never render as an apparently functional control before JS has run
+    // (spec 005, decision -- hidden-by-default toggle).
+    toggle.removeAttribute("hidden");
+  })();
+</script>
