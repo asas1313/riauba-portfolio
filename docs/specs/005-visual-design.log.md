@@ -9,4 +9,4 @@
 | Review | APPROVED | 2 | iter 1: CHANGES REQUESTED (docs missing, Header.astro eager-pin bug). Both fixed; docs written. iter 2: APPROVED, 2 optional nits (ADR-0004 status fixed to Accepted; matchMedia live-icon-update left as documented out-of-scope follow-up) |
 | Docs | DONE | 1 | technical/user-guide/CHANGELOG updated for spec 005; honestly documents the missing-baselines open item; make docs/lint green |
 | Final gate | GREEN | - | make test/lint/security/docs all pass after review approval |
-| PR | pending | - | |
+| PR | OK | - | https://github.com/asas1313/riauba-portfolio/pull/5 |

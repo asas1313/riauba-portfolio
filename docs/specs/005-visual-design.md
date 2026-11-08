@@ -1,6 +1,7 @@
 # 005 – Visual design (professional theme)
 
-Status: Draft
+Status: Final  ·  Owner: Andrius  ·  Date: 2026-11-08
+PR: https://github.com/asas1313/riauba-portfolio/pull/5
 
 ## Goal
 Replace the current ad-hoc styling with a calm, formal, professional look
