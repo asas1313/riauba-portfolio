@@ -5,7 +5,8 @@ Audience: recruiters and hiring managers (Scandinavia, EU, Lithuania). Primary l
 Lithuanian version later (spec 005).
 
 ## Stack
-- Astro 5 (static output), TypeScript strict, plain CSS (no Tailwind), zero client JS by default
+- Astro 7 (static output), TypeScript strict, plain CSS (no Tailwind), zero client JS by default
+  (upgraded from Astro 5 during spec 001: 5.x/6.x had unpatched critical/high npm audit advisories)
 - Content: `content/cv.yaml` (single source of truth for CV) and `content/projects/*.md` (Astro content collections)
 - PDF CV generated at build time with Playwright printing the `/cv/print` route → `dist/andrius-r-cv.pdf`
 - Tests: Vitest (unit, content schema validation), Playwright (e2e, accessibility via @axe-core/playwright)
