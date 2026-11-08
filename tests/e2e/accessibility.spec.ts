@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const paths = ["/", "/404"];
+const paths = ["/", "/404", "/cv", "/cv/print"];
 const colorSchemes = ["light", "dark"] as const;
 
 for (const path of paths) {

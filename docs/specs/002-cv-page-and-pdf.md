@@ -13,8 +13,8 @@ A full CV page and an always-up-to-date PDF CV, both generated from content/cv.y
 - **AC-1** Given cv.yaml, when /cv renders, then it shows summary, work (reverse chronological), skills, education, languages and certificates (sections with no data are hidden).
 - **AC-2** Given any field whose value is "TODO" or contains "TODO", when the site builds in production mode, then that field is omitted from both web and PDF, and the build prints a warning listing all TODO fields.
 - **AC-3** Given /cv/print, when rendered, then it is a print-optimised A4 layout (max 2 pages for the current content, no navigation, links printed as text).
-- **AC-4** Given `make build`, then Playwright prints /cv/print to dist/andrius-r-cv.pdf, and the PDF contains selectable text including basics.name.
-- **AC-5** Given /cv and the home page, then a clearly visible "Download CV (PDF)" link points to /andrius-r-cv.pdf.
+- **AC-4** Given `make build`, then Playwright prints /cv/print to dist/andrius-riauba-cv.pdf, and the PDF contains selectable text including basics.name.
+- **AC-5** Given /cv and the home page, then a clearly visible "Download CV (PDF)" link points to /andrius-riauba-cv.pdf.
 - **AC-6** Given /cv, then it includes JSON-LD (schema.org Person) built from cv.yaml.
 
 ## Non-goals

@@ -1,6 +1,6 @@
 import { parse as parseYaml } from "yaml";
 import { parseCv } from "./cv.schema.ts";
-import type { Profile } from "./cv.schema.ts";
+import type { Work } from "./cv.schema.ts";
 // Imported as a raw string via Vite's `?raw` suffix, not read with node:fs
 // at runtime: Vite resolves `?raw` imports against this module's *source*
 // location at transform time and inlines the file's contents as a string
@@ -26,24 +26,22 @@ function loadCv() {
 /** Parsed once at module load / build time. */
 export const cv = loadCv();
 
-/**
- * Returns true when `value` is the placeholder string "TODO", ignoring
- * surrounding whitespace and casing (so content typos like "todo" or
- * " TODO" are still treated as placeholders rather than being silently
- * published).
- */
-function isTodoPlaceholder(value: string): boolean {
-  return value.trim().toUpperCase() === "TODO";
-}
+// No-end-date ("ongoing") entries must sort as the most recent entry.
+// Lexically greater than any real "YYYY" or "YYYY-MM" date for the
+// foreseeable future, so it only ever matters as a comparison sentinel and
+// is never written to output.
+const ONGOING_SENTINEL = "9999-99";
 
 /**
- * Hides any profile entry whose network or url is the placeholder string
- * "TODO" (AC-2), matched case- and whitespace-insensitively. The fuller
- * "omit any TODO field + build warning" mechanism is spec 002's job.
+ * Sorts work entries reverse-chronologically (AC-1): by `endDate` (treating
+ * a missing `endDate` — an ongoing role — as the most recent), then by
+ * `startDate` as a tie-break, both descending.
  */
-export function getVisibleProfiles(profiles: Profile[]): Profile[] {
-  return profiles.filter(
-    (profile) =>
-      !isTodoPlaceholder(profile.network) && !isTodoPlaceholder(profile.url),
-  );
+export function getWorkReverseChronological(work: Work[]): Work[] {
+  return [...work].sort((a, b) => {
+    const aEnd = a.endDate ?? ONGOING_SENTINEL;
+    const bEnd = b.endDate ?? ONGOING_SENTINEL;
+    if (aEnd !== bEnd) return bEnd.localeCompare(aEnd);
+    return b.startDate.localeCompare(a.startDate);
+  });
 }

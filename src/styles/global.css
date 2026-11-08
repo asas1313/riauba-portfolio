@@ -122,3 +122,28 @@ main {
   border-top: 1px solid var(--color-border);
   color: var(--color-text-muted);
 }
+
+.cv-download-button {
+  display: inline-block;
+  margin: 0.5rem 0 1.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.375rem;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cv-download-button:hover,
+.cv-download-button:focus-visible {
+  text-decoration: underline;
+}
+
+.cv-work-entry {
+  margin-bottom: 1.5rem;
+}
+
+.cv-profiles {
+  list-style: none;
+  padding: 0;
+}

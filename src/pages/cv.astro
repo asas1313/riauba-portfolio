@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../components/BaseLayout.astro";
+import CvContent from "../components/CvContent.astro";
+import { cvForBuild } from "../lib/cv.publish.ts";
+import { buildPersonJsonLd } from "../lib/structured-data.ts";
+
+const shortDescription = `${cvForBuild.basics.name} — ${cvForBuild.basics.label}. Full CV, downloadable as PDF.`;
+---
+
+<BaseLayout
+  title={`CV — ${cvForBuild.basics.name}`}
+  description={shortDescription}
+  path="/cv"
+  structuredData={buildPersonJsonLd(cvForBuild)}
+>
+  <a
+    class="cv-download-button"
+    data-testid="cv-download-button"
+    href="/andrius-riauba-cv.pdf"
+  >
+    Download CV (PDF)
+  </a>
+  <CvContent cv={cvForBuild} />
+</BaseLayout>

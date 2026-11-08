@@ -6,7 +6,7 @@ const linkedIn = cv.basics.profiles.find(
   (profile) => profile.network === "LinkedIn",
 );
 
-const pages = ["/", "/404"];
+const pages = ["/", "/404", "/cv"];
 
 for (const path of pages) {
   test.describe(`shared layout on ${path}`, () => {
@@ -23,10 +23,9 @@ for (const path of pages) {
         "href",
         "/projects",
       );
-      await expect(nav.getByRole("link", { name: "CV" })).toHaveAttribute(
-        "href",
-        "/cv",
-      );
+      await expect(
+        nav.getByRole("link", { name: "CV", exact: true }),
+      ).toHaveAttribute("href", "/cv");
       await expect(
         nav.getByRole("link", { name: "How this site was built" }),
       ).toHaveAttribute("href", "/how-this-site-was-built");

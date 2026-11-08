@@ -32,15 +32,31 @@ test.describe("home page", () => {
     }
   });
 
-  test("hides profiles marked TODO", async ({ page }) => {
+  test("shows a Download CV (PDF) link in the header nav, pointing at /andrius-riauba-cv.pdf (AC-5)", async ({
+    page,
+  }) => {
     await page.goto("/");
-    const todoProfiles = cv.basics.profiles.filter(
-      (profile) => profile.network === "TODO" || profile.url === "TODO",
-    );
-    for (const profile of todoProfiles) {
-      if (profile.url !== "TODO") {
-        await expect(page.locator(`a[href="${profile.url}"]`)).toHaveCount(0);
-      }
+    const navLink = page
+      .locator("header nav")
+      .getByRole("link", { name: "Download CV (PDF)" });
+    await expect(navLink).toHaveAttribute("href", "/andrius-riauba-cv.pdf");
+  });
+
+  test("hides profiles marked TODO", async ({ page }) => {
+    // content/cv.yaml has no TODO-marked profiles right now, so this can't
+    // exercise the stripping path end-to-end against real content (that is
+    // covered directly by the `stripTodoFields`/`getPublishableCv` unit
+    // tests in tests/unit/cv.publish.test.ts, including the prod-build
+    // warning). What this test *can* assert, regardless of real content:
+    // the rendered production page never contains a literal "TODO"
+    // placeholder as a profile link's href or visible label.
+    await page.goto("/");
+    const main = page.locator("main");
+    await expect(main.locator('a[href="TODO"]')).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "TODO" })).toHaveCount(0);
+    for (const profile of cv.basics.profiles) {
+      expect(profile.network).not.toBe("TODO");
+      expect(profile.url).not.toBe("TODO");
     }
   });
 

@@ -63,6 +63,7 @@ export const cvSchema = z.object({
 
 export type Cv = z.infer<typeof cvSchema>;
 export type Profile = z.infer<typeof profileSchema>;
+export type Work = z.infer<typeof workSchema>;
 
 /**
  * Parses and validates raw CV data, throwing a human-readable error that

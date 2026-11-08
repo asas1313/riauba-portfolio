@@ -2,30 +2,29 @@
 import { getCollection } from "astro:content";
 import BaseLayout from "../components/BaseLayout.astro";
 import ProjectCard from "../components/ProjectCard.astro";
-import { cv, getVisibleProfiles } from "../lib/cv.ts";
+import { cvForBuild } from "../lib/cv.publish.ts";
 import { getFeaturedProjectsSorted } from "../lib/projects.ts";
 
-const visibleProfiles = getVisibleProfiles(cv.basics.profiles);
 const allProjects = await getCollection("projects");
 const featuredProjects = getFeaturedProjectsSorted(allProjects);
 // A short, dedicated description for search engines (typically truncated
 // around 150-160 chars), distinct from the full `cv.basics.summary` shown
 // in the page body below.
-const shortDescription = `${cv.basics.label} — portfolio, CV and project case studies.`;
+const shortDescription = `${cvForBuild.basics.label} — portfolio, CV and project case studies.`;
 ---
 
 <BaseLayout
-  title={`${cv.basics.name} — ${cv.basics.label}`}
+  title={`${cvForBuild.basics.name} — ${cvForBuild.basics.label}`}
   description={shortDescription}
   path="/"
 >
-  <h1>{cv.basics.name}</h1>
-  <p>{cv.basics.label}</p>
-  <p>{cv.basics.summary}</p>
-  <p>{cv.basics.remote}</p>
+  <h1>{cvForBuild.basics.name}</h1>
+  <p>{cvForBuild.basics.label}</p>
+  <p>{cvForBuild.basics.summary}</p>
+  <p>{cvForBuild.basics.remote}</p>
 
   <ul>
-    {visibleProfiles.map((profile) => (
+    {cvForBuild.basics.profiles.map((profile) => (
       <li>
         <a href={profile.url}>{profile.network}</a>
       </li>

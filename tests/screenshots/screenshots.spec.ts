@@ -49,4 +49,34 @@ test.describe("documentation screenshots", () => {
       fullPage: true,
     });
   });
+
+  test("cv page, light scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/cv");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}cv-light.png`,
+      fullPage: true,
+    });
+  });
+
+  test("cv page, dark scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/cv");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}cv-dark.png`,
+      fullPage: true,
+    });
+  });
+
+  test("cv/print page", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/cv/print");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}cv-print.png`,
+      fullPage: true,
+    });
+  });
 });

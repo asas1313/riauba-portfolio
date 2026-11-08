@@ -1,0 +1,33 @@
+---
+// A minimal print artifact of /cv (spec 002, decision #4): no Header,
+// Footer or nav, `noindex` since it is not a page search engines should
+// index separately from /cv, and a canonical pointing back at /cv. This is
+// the exact route scripts/build-pdf.mjs prints to PDF.
+import CvContent from "../../components/CvContent.astro";
+import { cvForBuild } from "../../lib/cv.publish.ts";
+import { buildPageSeo } from "../../lib/seo.ts";
+import "../../styles/global.css";
+import "../../styles/print.css";
+
+const seo = buildPageSeo(Astro.site ?? new URL("https://riauba.org/"), {
+  title: `CV — ${cvForBuild.basics.name}`,
+  description: `${cvForBuild.basics.name} — ${cvForBuild.basics.label}.`,
+  path: "/cv",
+});
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{seo.title}</title>
+    <meta name="robots" content="noindex" />
+    <link rel="canonical" href={seo.canonical} />
+  </head>
+  <body>
+    <main>
+      <CvContent cv={cvForBuild} />
+    </main>
+  </body>
+</html>

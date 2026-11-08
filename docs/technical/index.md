@@ -1,13 +1,14 @@
 # Technical documentation
 
 _Architecture, module responsibilities, configuration, runbook — for riauba.org as implemented
-by spec 001 (site foundation and home page)._
+by spec 001 (site foundation and home page) and spec 002 (CV page and PDF)._
 
 !!! note "Scope"
-    This describes what is built today: the static site skeleton and home page. The CV page
-    and PDF (/cv, /cv/print), the projects listing and detail pages (/projects,
-    /projects/&lt;slug&gt;) and the "How this site was built" page do **not** exist yet — the
-    header links to them intentionally, and they currently 404. They land in specs 002–004.
+    This describes what is built today: the static site skeleton, home page, and the CV page
+    and downloadable PDF (`/cv`, `/cv/print`). The projects listing and detail pages
+    (/projects, /projects/&lt;slug&gt;) and the "How this site was built" page do **not** exist
+    yet — the header links to them intentionally, and they currently 404. They land in specs
+    003–004.
 
 ## Architecture overview
 
@@ -31,6 +32,8 @@ flowchart TD
     subgraph lib["src/lib/"]
         cvts["cv.ts<br/>loads cv.yaml via Vite ?raw import"]
         cvschema["cv.schema.ts<br/>Zod schema + parseCv()"]
+        cvpublishts["cv.publish.ts<br/>cvForBuild (TODO-stripping)"]
+        structureddatats["structured-data.ts<br/>buildPersonJsonLd() / toSafeJsonLd()"]
         projectsts["projects.ts<br/>getFeaturedProjectsSorted()"]
         seots["seo.ts<br/>buildPageSeo()"]
     end
@@ -39,30 +42,47 @@ flowchart TD
 
     subgraph pages["src/pages/ + src/components/"]
         indexastro["index.astro"]
+        cvastro["cv.astro"]
+        cvprintastro["cv/print.astro"]
+        cvcontentastro["CvContent.astro"]
         notfound["404.astro"]
         baselayout["BaseLayout.astro<br/>Header + Footer + SEO tags"]
     end
 
     astrobuild["astro build"]
     dist["dist/ (static HTML/CSS/fonts)"]
+    buildpdf["scripts/build-pdf.mjs<br/>npm run preview + Playwright print"]
+    pdf["dist/andrius-riauba-cv.pdf"]
 
     cvyaml -->|"?raw string"| cvts
     cvts --> cvschema
     cvschema -->|"throws on invalid content<br/>(fails the build loudly)"| cvts
+    cvts --> cvpublishts
 
     projmd -->|"glob('*.md')"| contentconfig
     contentconfig -->|"validates frontmatter<br/>against Zod schema"| contentconfig
 
-    cvts --> indexastro
+    cvpublishts --> indexastro
+    cvpublishts --> cvastro
+    cvpublishts --> cvprintastro
+    structureddatats -->|"buildPersonJsonLd(cvForBuild)"| cvastro
+    structureddatats -->|"cv.astro's result flows in as the<br/>structuredData prop; toSafeJsonLd()<br/>renders the &lt;script&gt; tag"| baselayout
+    cvastro --> cvcontentastro
+    cvprintastro --> cvcontentastro
     contentconfig --> projectsts
     projectsts --> indexastro
     seots --> baselayout
     baselayout --> indexastro
+    baselayout --> cvastro
     baselayout --> notfound
 
     indexastro --> astrobuild
+    cvastro --> astrobuild
+    cvprintastro --> astrobuild
     notfound --> astrobuild
     astrobuild --> dist
+    dist --> buildpdf
+    buildpdf --> pdf
 ```
 
 Key properties of this build:
@@ -85,10 +105,66 @@ Key properties of this build:
 
 | Module | Responsibility |
 | --- | --- |
-| `cv.schema.ts` | Zod schema (`cvSchema`) matching the shape of `content/cv.yaml`; `parseCv(data)` validates and throws a readable, multi-issue error on failure. Exports the inferred `Cv` and `Profile` types. |
-| `cv.ts` | Loads `content/cv.yaml` (via a Vite `?raw` import, parsed with the `yaml` package) and validates it with `parseCv()` once at module load time, exporting the typed `cv` constant. Also exports `getVisibleProfiles(profiles)`, which filters out any profile whose `network` or `url` is the literal placeholder `"TODO"` (case- and whitespace-insensitive, so `"todo"` or `" TODO"` are also caught). |
+| `cv.schema.ts` | Zod schema (`cvSchema`) matching the shape of `content/cv.yaml`; `parseCv(data)` validates and throws a readable, multi-issue error on failure. Exports the inferred `Cv`, `Profile` and `Work` types. |
+| `cv.ts` | Loads `content/cv.yaml` (via a Vite `?raw` import, parsed with the `yaml` package) and validates it with `parseCv()` once at module load time, exporting the typed `cv` constant. Also exports `getWorkReverseChronological(work)`, which sorts work entries by `endDate` descending (an ongoing role with no `endDate` sorts as most recent), tie-broken by `startDate` descending. |
+| `cv.publish.ts` | The site's single TODO-filtering mechanism (spec 002) — see [TODO filtering](#todo-filtering-cvpublishts) below. Exports `cvForBuild`, the one `Cv` value every page/component should import instead of the raw `cv` export from `cv.ts`. |
+| `structured-data.ts` | `buildPersonJsonLd(cv)` maps `cv.basics` onto a [schema.org `Person`](https://schema.org/Person) object (name, jobTitle, email, url, address, `sameAs` profile URLs, description) for the `/cv` page's JSON-LD. `toSafeJsonLd(value)` serializes a value with `JSON.stringify` and escapes every literal `<` as `<` before it is injected into a `<script type="application/ld+json">` via `set:html`, so a CV field containing literal `<script>` text can never prematurely close the surrounding tag. |
 | `projects.ts` | `getFeaturedProjectsSorted(entries)` — pure helper that filters a list of `projects` collection entries down to `featured: true` and sorts them by `order` ascending. |
 | `seo.ts` | `buildPageSeo(site, { title, description, path })` — builds the `<title>`, meta description, canonical URL and Open Graph tag values for a page. `resolveCanonicalUrl` guarantees the canonical/OG URL always stays on the configured `site` origin (collapsing protocol-relative `//host` paths and stripping any foreign scheme/host from an absolute URL before resolving), throwing rather than ever emitting an off-site URL. No `og:image` is set yet. |
+
+### TODO filtering (`cv.publish.ts`)
+
+Every page and component that reads CV data imports `cvForBuild` from `src/lib/cv.publish.ts`
+— never the raw `cv` export from `cv.ts` directly — so there is exactly one place in the
+codebase that decides whether a `"TODO"`-marked placeholder in `content/cv.yaml` is visible.
+This replaces spec 001's `getVisibleProfiles(profiles)` helper (removed), which only filtered
+`basics.profiles` for the home page and footer; `cv.publish.ts` filters the *entire* CV tree
+(profiles, work entries, highlights, education, languages, certificates — anything) and is
+now also what the home page uses for its profile list, not a separate mechanism.
+
+Behaviour:
+
+- **Outside production builds** (`import.meta.env.PROD` is `false`, i.e. `astro dev` and
+  `astro build --mode development`), `cvForBuild` is identical to the raw, unfiltered `cv` —
+  every TODO placeholder renders as-is everywhere a page reads `cvForBuild`, including the
+  home page. (Before spec 002, the home page additionally hid TODO profiles during local dev
+  too; that special case is gone; dev now behaves the same as every other page.)
+- **In production builds** (`npm run build` / `astro build`), `getPublishableCv` calls
+  `stripTodoFields(cv)`, which deep-clones the parsed `Cv` and removes every field whose
+  string value matches the whole-word, case-sensitive pattern `/\bTODO\b/` — so a literal
+  word `TODO` anywhere, including inside a longer sentence like `"TODO: confirm start date"`,
+  matches, but `"todo"` (lowercase), padded variants like `" TODO "`, and a mid-word substring
+  such as `"Kristodoras"` do not. This is a deliberate narrowing from spec 001's
+  case-insensitive, whitespace-trimmed substring match.
+- `findTodoFields` recursively walks the cloned tree and returns the dot-path of every
+  matching string leaf (array indices appear as numeric segments, e.g. `"work.0.endDate"`).
+  `classifyTodoPath` then consults the Zod *shape* of `cvSchema` (not the data) to decide what
+  stripping a given path means. **Why schema-aware rather than one blanket rule:** a single
+  fixed policy is wrong in both directions. Always deleting just the field would publish a
+  `Work` entry missing a *required* field (e.g. a TODO `position` but a real `name` and dates),
+  silently shipping a half-filled record every downstream consumer (`CvContent.astro`, the PDF,
+  the JSON-LD) assumes is complete. Always dropping the whole containing record instead would
+  over-delete: a TODO in an *optional* field like `work[].endDate` (an ongoing role simply
+  hasn't ended yet) or a single still-TODO item inside a plain string array like `highlights`
+  would needlessly destroy an otherwise-complete, already-written work entry along with it.
+  Consulting the schema's required/optional shape per field lets the stripper pick the
+  narrowest removal that is still safe to publish for each case:
+  - the path's last segment is an index into a plain string array (`highlights`, `skills.*.keywords`)
+    → remove just that array element;
+  - the path resolves to an **optional** object field (anything accepting `undefined`, checked
+    via `fieldSchema.safeParse(undefined).success` rather than the deprecated `.isOptional()`)
+    → delete just that field;
+  - the path resolves to a **required** object field → drop the whole enclosing object from
+    its containing array (a profile/work/education/language entry disappears entirely rather
+    than being published half-filled).
+  - a required field with **no** containing array to drop from (e.g. `basics.name` lives
+    directly on the top-level `basics` object) is a deliberate hard failure, not a silent
+    null-out: `stripTodoFields` throws, naming the exact field path, per this project's
+    "fail loudly" convention — nulling `basics` would otherwise crash every downstream
+    consumer with a cryptic `TypeError` instead of a clear message.
+- Every path actually stripped is reported once via `console.warn`, listing all stripped
+  dot-paths, so a production build that silently drops content is still visible in the build
+  log.
 
 ### `src/content.config.ts`
 
@@ -104,15 +180,18 @@ closed enum — the four existing project files already use three different valu
 | Component | Responsibility |
 | --- | --- |
 | `BaseLayout.astro` | The shared HTML shell: `<head>` with charset/viewport/title/meta description/canonical/Open Graph tags (via `seo.ts`) and favicon, plus `Header`, a `<main>` slot, and `Footer`. Every page renders through this layout. |
-| `Header.astro` | Site navigation: Home, Projects, CV, "How this site was built". The last three links are live today but point at pages that don't exist until specs 002–004 ship (they currently 404). |
-| `Footer.astro` | Reads `cv.basics.email` and the visible LinkedIn profile (via `getVisibleProfiles`) to render a `mailto:` link and LinkedIn link, plus `© <current year> <cv.basics.name>`. |
+| `Header.astro` | Site navigation: Home, Projects, CV, "How this site was built", and a direct "Download CV (PDF)" link to `/andrius-riauba-cv.pdf`. The CV links are live (`/cv`, the PDF); Projects and "How this site was built" still point at pages that don't exist until specs 003–004 ship (they currently 404). |
+| `Footer.astro` | Reads `cvForBuild.basics.email` and the LinkedIn profile (found by matching `network` case-insensitively, after TODO-filtering has already run) to render a `mailto:` link and LinkedIn link, plus `© <current year> <cvForBuild.basics.name>`. |
+| `CvContent.astro` | Renders the full CV body (name/label/contact line/profiles/remote line, Summary, Experience, Skills, Education, Languages, Certificates — each section only shown when its underlying list/string is non-empty) from a `Cv` passed in as a prop. Shared, unstyled-by-page-chrome markup used identically by both `/cv` (inside `BaseLayout`) and `/cv/print` (standalone, for the PDF), so the two can never drift apart. Work entries are pre-sorted by the caller via `getWorkReverseChronological`. |
 | `ProjectCard.astro` | Renders one featured-project list item: a link to `/projects/<id>` (the collection entry's slug, derived by Astro from the markdown filename) with the project's `title`, and its `tagline`. |
 
 ### `src/pages/`
 
 | Page | Responsibility |
 | --- | --- |
-| `index.astro` | The home page. Reads `cv` and `getVisibleProfiles` to render name/label/summary/remote line and profile links; reads the `projects` collection via `getCollection("projects")` and `getFeaturedProjectsSorted` to render featured projects in `order`. Builds its own short SEO description distinct from the full CV summary. |
+| `index.astro` | The home page. Reads `cvForBuild` to render name/label/summary/remote line and profile links (TODO-filtered per `cv.publish.ts`); reads the `projects` collection via `getCollection("projects")` and `getFeaturedProjectsSorted` to render featured projects in `order`. Builds its own short SEO description distinct from the full CV summary. |
+| `cv.astro` | The `/cv` page. Renders a "Download CV (PDF)" button linking to `/andrius-riauba-cv.pdf`, then `<CvContent cv={cvForBuild} />`, through the normal `BaseLayout` (full header/footer/nav). Also passes `buildPersonJsonLd(cvForBuild)` to `BaseLayout` as `structuredData`, which serializes it into a `<script type="application/ld+json">` tag via `toSafeJsonLd`. |
+| `cv/print.astro` | The print-optimised source for the generated PDF (spec 002, decision #4): a minimal standalone HTML document — no `Header`/`Footer`/nav — rendering the same `<CvContent cv={cvForBuild} />`, with `<meta name="robots" content="noindex">` and a `<link rel="canonical">` pointing back at `/cv` so it is never indexed as a separate page. Imports `src/styles/print.css` in addition to the shared `global.css` for print-specific layout (e.g. page-break control). This is the exact URL `scripts/build-pdf.mjs` loads and prints to PDF; it is not meant to be browsed directly. |
 | `404.astro` | A styled not-found page through the same `BaseLayout`, with a link back to `/`. |
 
 ### Styling and fonts
@@ -177,13 +256,37 @@ CI (`.github/workflows/ci.yml`) runs, on every pull request and push to `main`: 
 `make lint`, `make test`, `make security`, `make docs`, then `make e2e` (which depends on
 `make build`), with the Playwright browser cache keyed on `package-lock.json`.
 
-### The `build:pdf` stub
+### The `build:pdf` step
 
-`npm run build:pdf` currently runs `scripts/build-pdf-stub.mjs`, which only logs a message and
-exits 0. It exists purely so `make build` succeeds end-to-end before spec 002 (CV page and PDF)
-lands; it does not generate `dist/andrius-r-cv.pdf`. Do not mistake it for the real PDF
-generation step described in CLAUDE.md (Playwright printing `/cv/print`) — that route does not
-exist yet.
+`npm run build:pdf` runs `scripts/build-pdf.mjs`, which generates the real, downloadable
+`dist/andrius-riauba-cv.pdf` by printing the `/cv/print` route with a headless Chromium driven
+by `playwright-core`. It replaces spec 001's no-op stub (`scripts/build-pdf-stub.mjs`, deleted).
+Full rationale and alternatives considered are in
+[ADR-0002](../adr/0002-pdf-generation-approach.md); the mechanics:
+
+1. `astro build` only produces static files in `dist/` — nothing serves them over HTTP, and
+   `page.goto()` needs a URL. So the script first spawns the project's own `npm run preview`
+   as a child process on a dedicated port (`4323`, distinct from the e2e suite's `4321` so the
+   two never collide even run back to back).
+2. It polls that server with `fetch` every 250ms until it responds, with a bounded 30s
+   timeout. Per this project's "fail loudly" convention, a server that never becomes ready
+   throws a descriptive error and exits non-zero rather than hanging `make build` forever.
+3. Once ready, it launches `chromium` (from `playwright-core`, pinned to the same version as
+   the `playwright`/`@playwright/test` dependency already used by the e2e suite — see ADR-0002
+   decision 2), navigates to `/cv/print`, waits for `document.fonts.ready` so printed text
+   isn't rendered with a fallback font, and calls `page.pdf({ path: "dist/andrius-riauba-cv.pdf",
+   format: "A4", printBackground: true })`.
+4. The preview server and browser are always torn down in a `finally` block, regardless of
+   whether printing succeeded. The server is started with `detached: true`, making it the
+   leader of its own OS process group, and is stopped by signalling that whole group
+   (`process.kill(-pid, "SIGTERM")`, falling back to `SIGKILL` after a 5s grace period) rather
+   than just the immediate child PID. This is deliberately more than a plain `child.kill()`:
+   manual QA surfaced that killing only the immediate `npm` process could leave the actual
+   `astro preview` process it had spawned running and holding port 4323, because some npm
+   versions replace the immediate child via `exec()` into a different process rather than
+   keeping it around as the thing that owns the listening socket — a plain, non-group kill
+   then has nothing left to signal, and the server survives to orphan the next run. Killing
+   the negative PID (the whole process group) reaches it either way.
 
 ### Common failures
 
@@ -197,8 +300,13 @@ exist yet.
 - **`make docs` fails with a strict mkdocs warning** — usually a broken internal link or a
   heading referenced by the nav that doesn't exist; `mkdocs build --strict` turns every warning
   into a build failure by design.
-- **A nav link (Projects, CV, "How this site was built") 404s** — expected today; those pages
-  don't exist until specs 002–004 ship.
+- **A nav link (Projects, "How this site was built") 404s** — expected today; those pages
+  don't exist until specs 003–004 ship. (`CV` and `Download CV (PDF)` are live — if either of
+  those 404s, something is actually broken; see the `build:pdf` section below.)
+- **`build:pdf` fails with "preview server ... did not become ready within 30000ms"** —
+  something is already bound to port 4323 (a leftover `astro preview` process from a prior
+  interrupted `build-pdf.mjs` run is the usual cause), or `astro build` didn't run first so
+  `dist/` is missing/stale. Free the port (or reboot the shell) and rerun `make build`.
 
 ### Adding a new project (developer-facing mechanics)
 
