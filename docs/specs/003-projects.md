@@ -1,6 +1,7 @@
 # 003 – Projects catalogue and detail pages
 
 Status: Final  ·  Owner: Andrius  ·  Date: 2026-11-08
+PR: https://github.com/asas1313/riauba-portfolio/pull/4
 
 ## Goal
 Every project Andrius has is reachable from the site, each with its own page linking to the live app, docs and repo.
