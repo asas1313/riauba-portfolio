@@ -1,5 +1,6 @@
 ---
 import { buildPageSeo } from "../lib/seo.ts";
+import { toSafeJsonLd } from "../lib/structured-data.ts";
 import Header from "./Header.astro";
 import Footer from "./Footer.astro";
 import "../styles/global.css";
@@ -8,9 +9,10 @@ interface Props {
   title: string;
   description: string;
   path: string;
+  structuredData?: unknown;
 }
 
-const { title, description, path } = Astro.props;
+const { title, description, path, structuredData } = Astro.props;
 const seo = buildPageSeo(Astro.site ?? new URL("https://riauba.org/"), {
   title,
   description,
@@ -31,6 +33,12 @@ const seo = buildPageSeo(Astro.site ?? new URL("https://riauba.org/"), {
     <meta property="og:type" content={seo.og.type} />
     <meta property="og:url" content={seo.og.url} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {structuredData !== undefined && (
+      <script
+        type="application/ld+json"
+        set:html={toSafeJsonLd(structuredData)}
+      />
+    )}
   </head>
   <body>
     <Header />

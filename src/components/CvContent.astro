@@ -1,0 +1,135 @@
+---
+import type { Cv } from "../lib/cv.schema.ts";
+import { getWorkReverseChronological } from "../lib/cv.ts";
+
+interface Props {
+  cv: Cv;
+}
+
+const { cv } = Astro.props;
+const work = getWorkReverseChronological(cv.work);
+const hasSummary = cv.basics.summary.trim().length > 0;
+---
+
+<article class="cv">
+  <header class="cv-header">
+    <h1>{cv.basics.name}</h1>
+    <p class="cv-label">{cv.basics.label}</p>
+    <p class="cv-contact">
+      <a href={`mailto:${cv.basics.email}`}>{cv.basics.email}</a>
+      {" · "}
+      <a href={cv.basics.url}>{cv.basics.url}</a>
+      {" · "}
+      {cv.basics.location.city}, {cv.basics.location.countryCode}
+    </p>
+    {cv.basics.profiles.length > 0 && (
+      <ul class="cv-profiles">
+        {cv.basics.profiles.map((profile) => (
+          <li>
+            {profile.network}: <a href={profile.url}>{profile.url}</a>
+          </li>
+        ))}
+      </ul>
+    )}
+    <p class="cv-remote">{cv.basics.remote}</p>
+  </header>
+
+  {hasSummary && (
+    <section class="cv-summary">
+      <h2>Summary</h2>
+      <p>{cv.basics.summary}</p>
+    </section>
+  )}
+
+  {work.length > 0 && (
+    <section class="cv-work">
+      <h2>Experience</h2>
+      {work.map((entry) => (
+        <article class="cv-work-entry" data-testid="cv-work-entry">
+          <h3>
+            {entry.position} · {entry.name}
+          </h3>
+          <p class="cv-dates">
+            {entry.startDate} – {entry.endDate ?? "Present"}
+          </p>
+          {entry.url && (
+            <p class="cv-work-url">
+              <a href={entry.url}>{entry.url}</a>
+            </p>
+          )}
+          <p>{entry.summary}</p>
+          {entry.highlights.length > 0 && (
+            <ul>
+              {entry.highlights.map((highlight) => (
+                <li>{highlight}</li>
+              ))}
+            </ul>
+          )}
+        </article>
+      ))}
+    </section>
+  )}
+
+  {cv.skills.length > 0 && (
+    <section class="cv-skills">
+      <h2>Skills</h2>
+      <ul>
+        {cv.skills.map((skill) => (
+          <li>
+            <strong>{skill.name}:</strong> {skill.keywords.join(", ")}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {cv.education.length > 0 && (
+    <section class="cv-education">
+      <h2>Education</h2>
+      <ul>
+        {cv.education.map((entry) => (
+          <li>
+            <strong>{entry.institution}</strong> — {entry.area} (
+            {entry.studyType})
+            {(entry.startDate || entry.endDate) && (
+              <span>
+                {" "}
+                · {entry.startDate ?? ""}
+                {entry.startDate && entry.endDate ? "–" : ""}
+                {entry.endDate ?? ""}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {cv.languages.length > 0 && (
+    <section class="cv-languages">
+      <h2>Languages</h2>
+      <ul>
+        {cv.languages.map((language) => (
+          <li>
+            {language.language}: {language.fluency}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {cv.certificates.length > 0 && (
+    <section class="cv-certificates">
+      <h2>Certificates</h2>
+      <ul>
+        {cv.certificates.map((certificate) => (
+          <li>
+            {Object.values(certificate)
+              .map((value) => String(value))
+              .join(" — ")}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+</article>

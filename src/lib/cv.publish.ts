@@ -37,8 +37,10 @@ type StripAction =
   | { kind: "optionalField"; path: string[] }
   | { kind: "requiredField"; objectPath: string[] };
 
-function unwrapOptional(schema: z.ZodTypeAny): z.ZodTypeAny {
-  return schema instanceof z.ZodOptional ? schema.unwrap() : schema;
+function unwrapOptional(schema: z.ZodType): z.ZodType {
+  return schema instanceof z.ZodOptional
+    ? (schema.unwrap() as z.ZodType)
+    : schema;
 }
 
 /**
@@ -54,9 +56,9 @@ function unwrapOptional(schema: z.ZodTypeAny): z.ZodTypeAny {
  *   array).
  */
 function classifyTodoPath(path: string[]): StripAction {
-  let schema: z.ZodTypeAny = cvSchema;
+  let schema: z.ZodType = cvSchema;
   let lastWasArrayIndex = false;
-  let lastFieldSchema: z.ZodTypeAny | undefined;
+  let lastFieldSchema: z.ZodType | undefined;
 
   for (let i = 0; i < path.length; i++) {
     const segment = path[i];
@@ -70,14 +72,14 @@ function classifyTodoPath(path: string[]): StripAction {
           `cv.publish: expected an array schema while resolving "${soFar}"`,
         );
       }
-      schema = unwrapped.element as z.ZodTypeAny;
+      schema = unwrapped.element as z.ZodType;
       lastWasArrayIndex = true;
       lastFieldSchema = undefined;
       continue;
     }
 
     if (unwrapped instanceof z.ZodObject) {
-      const fieldSchema = unwrapped.shape[segment] as z.ZodTypeAny | undefined;
+      const fieldSchema = unwrapped.shape[segment] as z.ZodType | undefined;
       if (!fieldSchema) {
         throw new Error(`cv.publish: unknown CV field "${soFar}"`);
       }
@@ -91,7 +93,7 @@ function classifyTodoPath(path: string[]): StripAction {
       // Open-ended records (e.g. `certificates`) have no named shape to
       // consult; treat every key's value type as the record's declared
       // value schema.
-      schema = unwrapped.valueType as z.ZodTypeAny;
+      schema = unwrapped.valueType as z.ZodType;
       lastFieldSchema = schema;
       lastWasArrayIndex = false;
       continue;
@@ -110,7 +112,12 @@ function classifyTodoPath(path: string[]): StripAction {
     };
   }
 
-  if (lastFieldSchema && lastFieldSchema.isOptional()) {
+  // `.isOptional()` is deprecated in zod v4; safe-parsing `undefined` is
+  // the documented replacement and avoids the deprecation warning.
+  const isOptional =
+    lastFieldSchema !== undefined &&
+    lastFieldSchema.safeParse(undefined).success;
+  if (isOptional) {
     return { kind: "optionalField", path };
   }
   return { kind: "requiredField", objectPath: path.slice(0, -1) };
