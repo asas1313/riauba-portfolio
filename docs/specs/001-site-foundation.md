@@ -1,6 +1,7 @@
 # 001 – Site foundation and home page
 
 Status: Final  ·  Owner: Andrius  ·  Date: 2026-11-08
+PR: https://github.com/asas1313/riauba-portfolio/pull/2
 
 ## Goal
 A fast, accessible static site skeleton for riauba.org with a home page that tells a recruiter in 10 seconds who Andrius is.

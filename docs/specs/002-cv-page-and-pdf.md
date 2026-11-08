@@ -1,6 +1,7 @@
 # 002 – CV page and downloadable PDF
 
 Status: Final  ·  Owner: Andrius  ·  Date: 2026-11-08
+PR: https://github.com/asas1313/riauba-portfolio/pull/3
 
 ## Goal
 A full CV page and an always-up-to-date PDF CV, both generated from content/cv.yaml.
