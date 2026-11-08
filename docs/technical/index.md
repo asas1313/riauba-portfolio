@@ -1,15 +1,17 @@
 # Technical documentation
 
 _Architecture, module responsibilities, configuration, runbook — for riauba.org as implemented
-by spec 001 (site foundation and home page), spec 002 (CV page and PDF) and spec 003 (projects
-catalogue and detail pages)._
+by spec 001 (site foundation and home page), spec 002 (CV page and PDF), spec 003 (projects
+catalogue and detail pages) and spec 005 (visual design: tokens, theme toggle, fonts, visual
+regression testing)._
 
 !!! note "Scope"
     This describes what is built today: the static site skeleton, home page, the CV page and
-    downloadable PDF (`/cv`, `/cv/print`), and the projects catalogue, tag filter and detail
+    downloadable PDF (`/cv`, `/cv/print`), the projects catalogue, tag filter and detail
     pages plus the "How this site was built" page (`/projects`, `/projects/tag/<tag>`,
-    `/projects/<slug>`, `/how-this-site-was-built`). Hosting and deployment are spec 004's
-    scope — not built on this branch.
+    `/projects/<slug>`, `/how-this-site-was-built`), and the AstroPaper-inspired visual theme
+    with a persisted light/dark toggle covering every page. Hosting and deployment are spec
+    004's scope — not built on this branch.
 
 ## Architecture overview
 
@@ -301,16 +303,107 @@ closed enum — the four existing project files already use three different valu
 | `how-this-site-was-built.astro` | The `/how-this-site-was-built` page (spec 003, AC-6): hand-written prose on the spec→plan→implement→test→review→docs pipeline and its two human approval gates, plus a table built from `getSpecIndex()` (number, title, status, PR link when present). |
 | `404.astro` | A styled not-found page through the same `BaseLayout`, with a link back to `/`. |
 
-### Styling and fonts
+### Styling and fonts (spec 005 — visual design)
 
-`src/styles/global.css` self-hosts Inter (OFL-licensed, `src/assets/fonts/*.woff2`) in two
-subsets per weight (400/600): `latin` and `latin-ext`. `latin-ext` is required, not optional —
-`content/cv.yaml` and `content/projects/*.md` contain Lithuanian diacritics (`ų`, `š`, `č`,
-`ė`) that the `latin`-only subset doesn't cover. Colour theming uses CSS custom properties
-switched by a `prefers-color-scheme: dark` media query; the dark-mode accent (`#60a5fa`) is a
-lighter tint of the light-mode accent (`#1d4ed8`), chosen to keep WCAG AA contrast against the
-dark background — verified by the axe accessibility e2e suite, not by a separate contrast
-checker.
+`src/styles/tokens.css` is the **single source of truth** for every colour, radius and font
+token used anywhere in the site. `global.css` `@import`s it first. `tests/unit/
+no-hardcoded-colors.test.ts` enforces this mechanically: it scans every `src/**/*.css` file and
+every `<style>` block in `src/**/*.astro` for hex, `rgb()`/`rgba()`, `hsl()` and `oklch()`
+colour literals and fails the build if any appear outside `tokens.css`.
+
+**Theme resolution order** (lowest to highest precedence, by source order — same specificity,
+later wins, no `!important` needed anywhere):
+
+1. `:root` — light-theme defaults (`--color-accent: #1d4ed8`).
+2. `@media (prefers-color-scheme: dark)` — the system preference, overriding `:root` when the
+   OS/browser reports a dark preference and nothing else has overridden it yet. The dark accent
+   is a distinct, lighter-tuned variant of the light accent's hue (`#7fb0ff`), not a reuse of
+   `#1d4ed8` on a dark background — tuned for WCAG AA contrast (`tests/e2e/
+   accessibility.spec.ts`).
+3. `[data-theme="light"]` / `[data-theme="dark"]` — a manual override, declared after the media
+   query above so a deliberate choice always beats the system preference. Set by the two inline
+   scripts below via `document.documentElement.dataset.theme`, alongside the CSS
+   `color-scheme` property so native form controls/scrollbars follow the active theme too.
+
+**The two inline `<script is:inline>` tags are the only client-side JavaScript shipped
+anywhere on the site**, a deliberate, narrow exception to "zero client JS by default"
+(`CLAUDE.md`) — a flash-free, persisted manual theme override is not achievable with CSS
+alone. Each wraps every `localStorage` access in `try`/`catch` (private-browsing/
+storage-disabled contexts throw on *access*, not just on write). Their final, shipped
+responsibilities are deliberately split and asymmetric:
+
+- **`BaseLayout.astro`'s head script** runs synchronously, immediately after `<meta charset>`,
+  before any stylesheet paints. It reads `localStorage.getItem("theme")` and, **only if** a
+  stored value is exactly `"light"` or `"dark"`, sets `dataset.theme` and `style.colorScheme` to
+  it. If nothing is stored, it does nothing at all — the `prefers-color-scheme` media query in
+  `tokens.css` already handles that case on its own. This is what prevents a flash of the wrong
+  theme on reload for a visitor who has made an explicit choice.
+- **`Header.astro`'s toggle script** attaches the click handler for the toggle `<button>`
+  (hidden by default via `[hidden]` in the base stylesheet, revealed only once the listener is
+  attached, so it never renders as an apparently-functional control before JS has run). On
+  **page load**, it only calls a small `updateButton()` helper that reflects the current
+  effective theme (read from `dataset.theme` if already set by the head script, else
+  `matchMedia("(prefers-color-scheme: dark)")`) onto the button's own `aria-pressed`/icon — it
+  deliberately does **not** pin `dataset.theme`/`style.colorScheme` on load. Only the **click**
+  handler runs the full `applyTheme()` flow: flip to the opposite theme, persist it to
+  `localStorage`, set `dataset.theme`/`style.colorScheme`, then update the button. This split
+  exists to fix a real bug found in review: an earlier version called the full pin-and-persist
+  flow on every page load regardless of whether anything was stored, which froze
+  `dataset.theme` to whatever the OS preference happened to be at first paint and broke live
+  `prefers-color-scheme` repaints for the rest of that page view for a visitor who had never
+  touched the toggle. See `docs/specs/005-visual-design.log.md` for the fix.
+- **If a Content-Security-Policy is ever added**, both inline scripts will need a `sha256-`
+  hash (or a nonce) in the `script-src` directive — `unsafe-inline` would defeat the point of
+  adding a CSP in the first place. No CSP exists today; this is a forward-looking note for
+  whoever adds one.
+
+**Fonts** are self-hosted (OFL-1.1), never loaded from a CDN or system font stack:
+
+- **Inter** — weights 400 and 600, each in two subsets, `latin` and `latin-ext`. `latin-ext` is
+  required, not optional: `content/cv.yaml` and `content/projects/*.md` contain Lithuanian
+  diacritics (`ų`, `š`, `č`, `ė`) the `latin`-only subset doesn't cover. Only the 400-weight
+  `latin`/`latin-ext` files (the above-the-fold body text font) are preloaded via `<link
+  rel="preload" as="font">` in `BaseLayout.astro`'s `<head>` — the imported font URLs (not
+  hard-coded strings) so the `href`s always match Vite's content-hashed output filenames. Inter
+  600 (headings) is deliberately **not** preloaded, since it's below the fold on most pages.
+- **JetBrains Mono** — weight 400, `latin` + `latin-ext` subsets, self-hosted the same way, for
+  `code`/`pre`. Added pre-emptively: no current `content/projects/*.md` file uses inline code or
+  code blocks, so it has no visible effect yet, but this keeps "no system/CDN font for *any*
+  rendered text" true immediately once a future write-up does use `code`/`pre`. **Not
+  preloaded** — zero bytes requested on any page without `code`/`pre`.
+- Licensing for both families is recorded in `THIRD_PARTY_NOTICES.md` at the repo root, which
+  also scopes exactly what was ported from AstroPaper (MIT) — design-token structure/naming and
+  page-layout/component visual patterns only, no source code or build tooling.
+
+**Visual regression testing.** A dedicated Playwright suite, `tests/visual/pages.spec.ts`
+(config: `playwright.visual.config.ts`, `testDir: "tests/visual"`), takes `toHaveScreenshot()`
+baselines of `/`, `/cv`, `/projects`, a project detail page, a tag page, `/how-this-site-was-
+built` and `/404` in both light and dark themes, plus `/` and `/cv` at 360px width in light
+theme only — 16 baselines in total — each awaiting `page.evaluate(() => document.fonts.ready)`
+before capturing. This is a separate suite from the pre-existing `tests/screenshots/`
+documentation-screenshot capture (opt-in, overwrites `docs/user-guide/img/*.png`, asserts
+nothing about pixel content) — two distinct purposes, no overlap.
+
+Because font anti-aliasing/hinting differs across host OSes and would otherwise produce
+spurious pixel diffs unrelated to any real regression, this suite is designed to run **only**
+inside the official, version-pinned `mcr.microsoft.com/playwright` Docker image — never on a
+bare host. `make visual` (asserts against committed baselines) and `make visual-update`
+(regenerates them with `--update-snapshots`, the *only* supported way to change a baseline PNG)
+both wrap the test run in `docker run --user $(id -u):$(id -g) --ipc=host` against that image;
+the image tag's version segment is kept in lockstep with the installed `@playwright/test`
+version by `tests/unit/playwright-docker-version.test.ts`. The same image is used natively in
+CI via `.github/workflows/ci.yml`'s `visual` job (`jobs.visual.container.image`, no Docker
+daemon needed there). See [ADR-0004](../adr/0004-visual-regression-docker.md) for the full
+rationale and alternatives considered.
+
+**Known open item, honestly flagged: no baseline PNGs are committed yet.** Neither the
+implementing nor the testing session for spec 005 had local Docker access, so
+`tests/visual/pages.spec.ts-snapshots/` is currently empty. Without baselines, every run of the
+suite fails with a missing-snapshot error rather than a real comparison — so the CI `visual` job
+currently has `continue-on-error: true` set, with an inline comment explaining why, and is
+**not yet a blocking gate**. The job (and this note) should be revisited — remove
+`continue-on-error` from `.github/workflows/ci.yml` — once someone with local Docker access
+runs `make visual-update` and commits the resulting baseline PNGs.
 
 ## Configuration
 
@@ -369,12 +462,18 @@ Run from the repository root:
 | `make build` | `npm run build` (`astro build` → `dist/`) then `npm run build:pdf`. |
 | `make e2e` | Runs `make build` first, then the Playwright e2e suite (`tests/e2e/`), including `@axe-core/playwright` accessibility scans. |
 | `make screenshots` | Opt-in only — builds the site and regenerates `docs/user-guide/img/*.png` via a separate Playwright config (`playwright.screenshots.config.ts`). Not part of `make e2e` or CI because it overwrites tracked screenshots. |
+| `make visual` | Opt-in, requires Docker — builds the site, then runs the `tests/visual/` screenshot-regression suite against committed baselines, inside the pinned `mcr.microsoft.com/playwright` Docker image (see [Styling and fonts](#styling-and-fonts-spec-005-visual-design)). Not part of `make e2e`; `make setup` does not install Docker. |
+| `make visual-update` | Same as `make visual`, with `--update-snapshots`. The *only* supported way to change a `tests/visual/` baseline PNG — never run on a bare host. |
 | `make security` | `npm audit --audit-level=high`. |
 | `make docs` | Builds this documentation site with `mkdocs build --strict` (fails on any warning). |
 
 CI (`.github/workflows/ci.yml`) runs, on every pull request and push to `main`: `make setup`,
 `make lint`, `make test`, `make security`, `make docs`, then `make e2e` (which depends on
-`make build`), with the Playwright browser cache keyed on `package-lock.json`.
+`make build`), with the Playwright browser cache keyed on `package-lock.json`. A separate
+`visual` job runs the same `tests/visual/` suite natively inside the pinned Playwright Docker
+image (GitHub Actions' `container:` key); it currently has `continue-on-error: true` set since
+no baseline PNGs are committed yet — see the note at the end of [Styling and
+fonts](#styling-and-fonts-spec-005-visual-design) above.
 
 ### The `build:pdf` step
 

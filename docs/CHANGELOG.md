@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Added (spec 005 — visual design)
+
+- A calm, professional, AstroPaper-inspired visual theme ported as a visual layer only (design
+  tokens/layout patterns, no Tailwind, no source code from that project) — `src/styles/
+  tokens.css` becomes the single source of every colour/radius/font token, enforced by a new
+  `tests/unit/no-hardcoded-colors.test.ts` guard against stray colour literals elsewhere.
+- Light/dark theme toggle (sun/moon button in the header), persisted via `localStorage`, with
+  no flash of the wrong theme on reload and no freezing of a live OS theme change for a visitor
+  who hasn't made an explicit choice — the only client-side JavaScript on the site, split across
+  a `<head>` script (`BaseLayout.astro`) and a toggle-button script (`Header.astro`).
+- Restyled components: project cards now render on an actual elevated card surface (not a bare
+  list item), tag chips, primary/secondary link buttons (assigned by link type —
+  `live` > `docs` > `repo` priority, not DOM position), CV page sections, and the CV download
+  button, all restyled purely from the token file with no markup/test-id changes.
+- Skip-to-content link, active-nav-link state (`aria-current="page"`), and a `flex-wrap`-based
+  responsive nav needing no JavaScript or collapsing mechanism at any width. Footer gains a
+  GitHub link alongside email/LinkedIn/copyright.
+- Self-hosted JetBrains Mono (latin + latin-ext, weight 400) added for `code`/`pre`, alongside
+  the existing self-hosted Inter; only the above-the-fold Inter 400 files are preloaded.
+  `THIRD_PARTY_NOTICES.md` added at the repo root, crediting Inter, JetBrains Mono and
+  AstroPaper's MIT-licensed design language.
+- A new, Docker-pinned Playwright visual-regression suite (`tests/visual/`, `make visual`/
+  `make visual-update`, a new CI job) distinct from the existing documentation-screenshot
+  capture — see [ADR-0004](adr/0004-visual-regression-docker.md).
+- **Known open item:** no baseline screenshots are committed yet for the new visual-regression
+  suite — neither the implementing nor the testing session had local Docker access, which the
+  suite requires. The CI `visual` job therefore currently runs with `continue-on-error: true`
+  and is not yet a blocking gate; it becomes one once someone with local Docker access runs
+  `make visual-update` and commits real baseline PNGs.
+
 ### Added (spec 003 — projects catalogue and detail pages)
 
 - `/projects` catalogue page listing every project (not just featured ones) from
