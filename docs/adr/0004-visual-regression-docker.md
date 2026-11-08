@@ -1,6 +1,6 @@
 # ADR-0004: Visual regression testing inside the official Playwright Docker image
 
-Status: Proposed · Date: 2026-11-08
+Status: Accepted · Date: 2026-11-08
 
 ## Context
 
@@ -76,8 +76,8 @@ host OS.
   every baseline wholesale (even for visually-unchanged pages), since the pinned Docker image
   tag must move in lockstep — an accepted, recurring maintenance cost of this approach.
 - The image is pulled from `mcr.microsoft.com` (Microsoft's container registry), a US-hosted
-  source; this is flagged explicitly as an open question in the spec 005 plan given `CLAUDE.md`'s
-  general "avoid adding US cloud services without asking" preference, since AC-11 leaves no
+  source; this is an accepted exception to `CLAUDE.md`'s general "avoid adding US cloud
+  services without asking" preference (spec 005 plan, Decision 2), since AC-11 leaves no
   realistic non-US-hosted alternative that is still "the official Playwright Docker image."
 - `make test`/`make e2e`/CI's main job stay exactly as fast and Docker-free as they are today;
   only the new, separate `visual` target/job pays the Docker-pull and container-overhead cost.
