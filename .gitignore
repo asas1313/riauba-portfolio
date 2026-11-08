@@ -7,3 +7,6 @@ target/
 dist/
 .claude/settings.local.json
 Profile.pdf
+.astro/
+test-results/
+playwright-report/
