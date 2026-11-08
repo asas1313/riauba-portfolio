@@ -33,8 +33,16 @@ function baseCvFixture(): Cv {
       },
     ],
     skills: [{ name: "Backend", keywords: ["Java", "Spring Boot"] }],
-    education: [],
-    languages: [],
+    education: [
+      {
+        institution: "Vilnius University",
+        area: "Economics",
+        studyType: "Bachelor's degree",
+        startDate: "2010",
+        endDate: "2015",
+      },
+    ],
+    languages: [{ language: "Lithuanian", fluency: "Native" }],
     certificates: [],
   };
 }
@@ -69,6 +77,18 @@ describe("findTodoFields", () => {
     const fixture = baseCvFixture();
     fixture.work[0].summary = "TODO: ask about dates";
     expect(findTodoFields(fixture)).toEqual(["work.0.summary"]);
+  });
+
+  it("matches TODO at the very end of the string (end-of-string word boundary)", () => {
+    const fixture = baseCvFixture();
+    fixture.work[0].summary = "Dates to confirm: TODO";
+    expect(findTodoFields(fixture)).toEqual(["work.0.summary"]);
+  });
+
+  it("does not match when TODO is glued to other word characters on either side", () => {
+    const fixture = baseCvFixture();
+    fixture.work[0].summary = "xTODOx placeholder";
+    expect(findTodoFields(fixture)).toEqual([]);
   });
 });
 
@@ -158,6 +178,54 @@ describe("stripTodoFields", () => {
     fixture.skills[0].keywords = ["Java", "TODO", "Spring Boot"];
     const { cv } = stripTodoFields(fixture);
     expect(cv.skills[0].keywords).toEqual(["Java", "Spring Boot"]);
+  });
+
+  it("drops only the optional field (startDate) on an education entry when it is TODO, keeping the rest", () => {
+    const fixture = baseCvFixture();
+    fixture.education[0].startDate = "TODO";
+    const { cv } = stripTodoFields(fixture);
+    expect(cv.education).toHaveLength(1);
+    expect(cv.education[0].startDate).toBeUndefined();
+    expect(cv.education[0].institution).toBe("Vilnius University");
+  });
+
+  it("drops the whole education entry when a required field (institution) is TODO", () => {
+    const fixture = baseCvFixture();
+    fixture.education.push({
+      institution: "TODO",
+      area: "Java",
+      studyType: "Programming course",
+    });
+    const { cv } = stripTodoFields(fixture);
+    expect(cv.education.map((e) => e.institution)).toEqual([
+      "Vilnius University",
+    ]);
+  });
+
+  it("drops the whole language entry when a required field (language) is TODO", () => {
+    const fixture = baseCvFixture();
+    fixture.languages.push({ language: "TODO", fluency: "Native" });
+    const { cv } = stripTodoFields(fixture);
+    expect(cv.languages).toHaveLength(1);
+    expect(cv.languages[0].language).toBe("Lithuanian");
+  });
+
+  it("drops the whole language entry when a required field (fluency) is TODO", () => {
+    const fixture = baseCvFixture();
+    fixture.languages.push({ language: "French", fluency: "TODO" });
+    const { cv } = stripTodoFields(fixture);
+    expect(cv.languages.map((l) => l.language)).toEqual(["Lithuanian"]);
+  });
+
+  it("drops only the TODO-valued key from an open-ended certificate record, keeping its siblings", () => {
+    const fixture = baseCvFixture();
+    fixture.certificates.push({
+      name: "AWS Certified Developer",
+      issuer: "TODO",
+    });
+    const { cv } = stripTodoFields(fixture);
+    expect(cv.certificates).toHaveLength(1);
+    expect(cv.certificates[0]).toEqual({ name: "AWS Certified Developer" });
   });
 
   it("returns every stripped path, one per TODO match", () => {
