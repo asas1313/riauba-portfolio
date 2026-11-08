@@ -1,0 +1,108 @@
+/* Print-optimised layout for /cv/print (spec 002, AC-3). Deliberately
+   dense: the goal is to fit the full CV onto at most 2 A4 pages (hard
+   ceiling, no preference for 1 vs 2 — decision #8), not to look identical
+   to the /cv web page. */
+
+@page {
+  size: A4;
+  margin: 10mm 14mm;
+}
+
+body {
+  margin: 0;
+  font-size: 9.5pt;
+  line-height: 1.3;
+}
+
+.cv {
+  max-width: none;
+}
+
+.cv-header h1 {
+  margin: 0 0 0.1em;
+  font-size: 16pt;
+}
+
+.cv-label {
+  margin: 0 0 0.3em;
+  font-size: 10.5pt;
+}
+
+.cv-contact {
+  margin: 0 0 0.2em;
+}
+
+.cv-profiles {
+  margin: 0 0 0.3em;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1em;
+}
+
+.cv-remote {
+  margin: 0 0 0.6em;
+  font-size: 9pt;
+}
+
+.cv h2 {
+  margin: 0.5em 0 0.2em;
+  padding-top: 0.2em;
+  border-top: 1px solid #ccc;
+  font-size: 11pt;
+}
+
+.cv-work-entry {
+  margin: 0 0 0.4em;
+}
+
+.cv-work-entry h3 {
+  margin: 0;
+  font-size: 10pt;
+}
+
+.cv-work-entry .cv-dates,
+.cv-work-entry .cv-work-url {
+  margin: 0;
+  font-size: 9pt;
+  /* Uses the shared, axe-verified muted-text variable (global.css) rather
+     than a fixed hex so dark-mode on-screen rendering of this route (it is
+     not styled behind `@media print`, so it is also viewed on-screen by
+     the accessibility e2e suite) keeps AA contrast against --color-bg. */
+  color: var(--color-text-muted);
+}
+
+.cv-work-entry p {
+  margin: 0.15em 0;
+}
+
+.cv-work-entry ul {
+  margin: 0.15em 0 0;
+  padding-left: 1.1em;
+}
+
+.cv-work-entry li {
+  margin: 0;
+}
+
+.cv-skills ul,
+.cv-education ul,
+.cv-languages ul,
+.cv-certificates ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+
+.cv-skills li,
+.cv-education li,
+.cv-languages li,
+.cv-certificates li {
+  margin: 0 0 0.15em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  word-break: break-all;
+}
