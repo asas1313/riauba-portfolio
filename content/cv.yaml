@@ -1,79 +1,207 @@
 # Single source of truth for the CV page and the generated PDF.
 # Lines marked TODO must be filled in by Andrius. Agents must never invent values here.
 basics:
-  name: "Andrius R."                      # TODO: full surname if you want it public
+  name: "Andrius Riauba"
   label: "Senior Java Developer · AI Engineer"
-  email: "TODO@riauba.org"
+  email: "andrius@riauba.org"
   url: "https://riauba.org"
-  location: { city: "Vilnius region", countryCode: "LT" }   # TODO: confirm wording
-  remote: "Open to remote / hybrid B2B contracts in Scandinavia and the EU"
+  location: { city: "Vilnius", countryCode: "LT" }
+  remote: "Open to senior backend engineering roles — hybrid in Vilnius or remote B2B"
   profiles:
     - { network: "LinkedIn", url: "https://www.linkedin.com/in/andrius-r" }
-    - { network: "GitHub", url: "TODO" }
+    - { network: "GitHub", url: "https://github.com/asas1313" }
   summary: >
     Senior Java backend engineer with 8+ years in banking and critical public infrastructure:
     payments (SEPA, domestic and cross-border clearing), mainframe-to-microservices migration,
-    national registries and investment platforms. Combines hands-on engineering with business
-    analysis and project management experience. Now building AI-powered products and
-    agentic software delivery pipelines with Claude.
+    national registries and a government case-management system built on Camunda. Combines
+    hands-on engineering with a background in business analysis and project management. Now
+    building AI-first products and agentic software delivery pipelines with Claude Code,
+    including his own tax-planning SaaS, Atsidėk.
 
 work:
-  - name: "Danske Bank"
-    position: "Senior Java Developer"           # TODO: confirm title
-    startDate: "TODO"
-    endDate: "TODO"
-    summary: "Payments modernisation: migration of payment processing from mainframe to Java microservices."
-    highlights:
-      - "Built and migrated payment flows for SEPA, domestic and cross-border clearing."
-      - "Designed Prometheus/Grafana dashboards and alerting for payment services."
-      - "Early adopter of GitHub Copilot in the team."
-      - "TODO: one measurable result (volume, latency, incidents reduced, systems decommissioned)."
-  - name: "Registrų centras"
-    position: "Java Developer"                  # TODO
-    startDate: "TODO"
-    endDate: "TODO"
-    summary: "Development of Lithuania's critical state registries."
-    highlights:
-      - "Identity and access management with Keycloak."
-      - "Oracle and PostgreSQL data layers for high-integrity registry data."
-      - "TODO: measurable result."
-  - name: "SEB"
-    position: "Java Developer"                  # TODO
-    startDate: "TODO"
-    endDate: "TODO"
-    summary: "Investment platform development."
-    highlights:
-      - "TODO: what you built and its impact."
-  - name: "Baltic Amadeus"
-    position: "TODO"
-    startDate: "TODO"
-    endDate: "TODO"
-    highlights:
-      - "Terraform infrastructure: version upgrades and server migration that reduced hosting costs."
   - name: "Atsidėk (own product)"
-    position: "Founder & Engineer"
+    position: "Founder & Senior Software Engineer"
     startDate: "2026-10"
     url: "https://atsidek.eu"
+    summary: >
+      Tax-planning web service for individual-activity (IV) holders in Lithuania, helping
+      self-employed people estimate and plan their income tax and social security contributions.
     highlights:
-      - "Tax-planning SaaS for Lithuanian self-employed: Spring Boot calculation engine, Python AI assistant on the Claude API."
+      - "Designed and built the product end-to-end, working AI-first with Claude Code as a daily coding agent."
+      - "Built a JSON API designed to be consumed by an AI assistant."
+      - "Built the Spring Boot calculation engine, a plain HTML front end, and a Python service integrating the Claude API for the AI assistant."
+      - "Run separate staging and production environments, validating new features on staging before release."
+      - "Self-host the development database and supporting services on a Proxmox homelab."
+
+  - name: "State Child Rights Protection and Adoption Service (under the Ministry of Social Security and Labour)"
+    position: "Senior Software Engineer"
+    startDate: "2026-04"
+    endDate: "2026-09"
+    summary: "Government case-management system for child-protection business processes."
+    highlights:
+      - "Built a core system around Camunda (BPM engine) orchestrating business processes, backed by PostgreSQL and a set of Java microservices."
+      - "Designed and implemented integrations with multiple external systems via REST and SOAP protocols."
+      - "Worked within a regulated, data-sensitive government domain requiring strict process traceability and auditability."
+
+  - name: "Baltic Amadeus"
+    position: "Java Software Engineer"
+    startDate: "2025-07"
+    endDate: "2026-04"
+    summary: >
+      Government modernisation project at Registrų Centras (Lithuanian Center of Registers),
+      one of Lithuania's critical public-sector registries. Acted as informal technical lead
+      within a cross-functional development team.
+    highlights:
+      - "Analyzed the legacy system and contributed to the architecture of the new solution, defining service boundaries and integration patterns."
+      - "Acted as an informal programming team lead: coordinated development tasks, conducted code reviews, and supported junior engineers."
+      - "Designed and implemented new REST APIs and internal microservices applying Spring Boot best practices."
+      - "Integrated Keycloak for identity and access management, AWS S3 for document storage, and new internal services replacing legacy components."
+      - "Worked with a dual-database setup — Oracle (PL/SQL) for legacy data and PostgreSQL for new services — ensuring consistent data integrity across both."
+      - "Used RabbitMQ for asynchronous event-driven communication between services."
+      - "Maintained infrastructure as code with Terraform: upgraded Terraform and provider versions and migrated workloads to more cost-efficient server types, cutting hosting costs by ~30%."
+
+  - name: "Danske Bank"
+    position: "Java Software Engineer"
+    startDate: "2023-02"
+    endDate: "2025-07"
+    summary: >
+      Core member of a 13-person team (8 engineers) migrating Danske Bank's payment processing
+      from a mainframe legacy system to a cloud-native microservices platform, handling SEPA,
+      domestic and cross-border clearing. Several new customers were onboarded directly onto
+      the cloud-native platform.
+    highlights:
+      - "Built payment gateway services in Java/Spring Boot processing SEPA, domestic and other clearing types."
+      - "Built dynamic routing logic driven by a configurable rule set, selecting the clearing scheme per payment attributes without requiring code changes."
+      - "Implemented JWT token validation, required-claims checks, and deduplication on inbound and outbound payment flows."
+      - "Designed microservices communicating via Kafka for scalable, resilient payment event processing."
+      - "Built Grafana dashboards and Prometheus alerts to monitor payment services in production."
+      - "Operated within a fully automated CI/CD pipeline on Kubernetes, managed with Argo CD and GitHub Actions."
+      - "Wrote unit, integration and load tests to validate service behavior under realistic traffic; used GitHub Copilot for AI-assisted development."
+
+  - name: "SEB"
+    position: "Java Software Developer"
+    startDate: "2022-02"
+    endDate: "2023-02"
+    summary: "Investment platform development."
+    highlights:
+      - "Built features for an investment platform using Spring Boot, MS SQL and Open 4GL."
+
+  - name: "Modernios Informacinės Technologijos"
+    position: "Flutter Developer"
+    startDate: "2020-12"
+    endDate: "2022-01"
+    summary: "Cross-platform mobile app development."
+    highlights:
+      - "Built and delivered several cross-platform mobile applications in Flutter (Dart), the company's main production technology."
+
+  - name: "Alna Software"
+    position: "Java Web Developer"
+    startDate: "2020-08"
+    endDate: "2020-12"
+    summary: "Government project development."
+    highlights:
+      - "Built new modules for a government project using Spring, JavaScript and Oracle."
+
+  - name: "Various companies"
+    position: "Business Analyst, IT Project Manager & Entrepreneur"
+    startDate: "2002-11"
+    endDate: "2020-11"
+    summary: >
+      Business analysis, IT project management and entrepreneurship, including business
+      management system consulting, a self-run venture portfolio, and IT programming
+      (Gupta SQL Windows, Oracle, PL/SQL).
+    highlights: []
+
+  - name: "Informacinių projektų sistemos, UAB"
+    position: "Information Technology Programmer"
+    startDate: "1999"
+    endDate: "2002"
+    summary: "Programming in Gupta SQL Windows, Oracle DBS, PL/SQL."
+    highlights: []
 
 skills:
-  - { name: "Backend", keywords: ["Java", "Spring Boot", "Microservices", "REST", "Maven"] }
-  - { name: "Payments & banking", keywords: ["SEPA", "Domestic clearing", "Cross-border payments", "Mainframe migration"] }
-  - { name: "Data", keywords: ["PostgreSQL", "Oracle"] }
+  - {
+      name: "Backend",
+      keywords:
+        [
+          "Java",
+          "Spring Boot",
+          "Microservices",
+          "REST",
+          "SOAP",
+          "Kafka",
+          "RabbitMQ",
+          "Camunda",
+          "Maven",
+        ],
+    }
+  - {
+      name: "Payments & banking",
+      keywords:
+        [
+          "SEPA",
+          "Domestic clearing",
+          "Cross-border payments",
+          "Mainframe migration",
+          "JWT",
+        ],
+    }
+  - { name: "Data", keywords: ["PostgreSQL", "Oracle", "MS SQL"] }
   - { name: "Security & identity", keywords: ["Keycloak"] }
-  - { name: "AI engineering", keywords: ["Python", "Claude API", "Claude Code", "Agentic workflows", "LLM-assisted delivery"] }
-  - { name: "Ops & infrastructure", keywords: ["Docker", "Terraform", "Prometheus", "Grafana", "Proxmox", "Cloudflare", "GitHub Actions"] }
-  - { name: "Other", keywords: ["Business analysis", "Project management"] }
+  - {
+      name: "AI engineering",
+      keywords:
+        [
+          "Python",
+          "Claude API",
+          "Claude Code",
+          "GitHub Copilot",
+          "Agentic workflows",
+          "LLM-assisted delivery",
+        ],
+    }
+  - {
+      name: "Ops & infrastructure",
+      keywords:
+        [
+          "Docker",
+          "Kubernetes",
+          "Terraform",
+          "AWS",
+          "GCP",
+          "Prometheus",
+          "Grafana",
+          "Proxmox",
+          "Cloudflare",
+          "GitHub Actions",
+          "Argo CD",
+        ],
+    }
+  - {
+      name: "Other",
+      keywords: ["Business analysis", "Project management", "Flutter (Dart)"],
+    }
 
 education:
-  - institution: "TODO"
-    area: "TODO"
-    studyType: "TODO"
-    endDate: "TODO"
+  - institution: "Vilnius University"
+    area: "Economics/Finance"
+    studyType: "Bachelor's degree"
+    startDate: "2010"
+    endDate: "2015"
+  - institution: "Software Development Academy"
+    area: "Java"
+    studyType: "Programming course"
+    startDate: "2019"
+    endDate: "2020"
+  - institution: "Software Development Academy"
+    area: "Computer Programming/Programmer, General"
+    studyType: "Programming course"
+    endDate: "2020-07"
 
 languages:
   - { language: "Lithuanian", fluency: "Native" }
-  - { language: "English", fluency: "TODO" }
+  - { language: "English", fluency: "Full Professional" }
+  - { language: "Russian", fluency: "Full Professional" }
+  - { language: "Polish", fluency: "Limited Working" }
 
-certificates: []    # TODO, optional
+certificates: [] # TODO, optional — none listed in Profile.pdf
