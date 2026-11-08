@@ -1,0 +1,22 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../components/BaseLayout.astro";
+import ProjectCard from "../../components/ProjectCard.astro";
+import { getAllProjectsSorted } from "../../lib/projects.ts";
+
+const allProjects = await getCollection("projects");
+const projects = getAllProjectsSorted(allProjects);
+---
+
+<BaseLayout
+  title="Projects — Andrius Riauba"
+  description="Every project Andrius has built or worked on, with stack tags and links to the live app, docs and repo where available."
+  path="/projects"
+>
+  <h1>Projects</h1>
+  <ul>
+    {projects.map((project) => (
+      <ProjectCard project={project} />
+    ))}
+  </ul>
+</BaseLayout>

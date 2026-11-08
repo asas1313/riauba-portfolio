@@ -1,0 +1,53 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../components/BaseLayout.astro";
+import { slugifyTag } from "../../lib/projects.ts";
+import { getVisibleProjectLinks } from "../../lib/project-links.ts";
+
+export async function getStaticPaths() {
+  const allProjects = await getCollection("projects");
+  return allProjects.map((project) => ({
+    params: { slug: project.id },
+    props: { project },
+  }));
+}
+
+interface Props {
+  project: Awaited<ReturnType<typeof getCollection<"projects">>>[number];
+}
+
+const { project } = Astro.props;
+const { Content } = await render(project);
+const visibleLinks = getVisibleProjectLinks(project.data.links);
+---
+
+<BaseLayout
+  title={`${project.data.title} — Andrius Riauba`}
+  description={project.data.tagline}
+  path={`/projects/${project.id}`}
+>
+  <h1>{project.data.title}</h1>
+  <span class="project-badge">{project.data.status}</span>
+  <p>{project.data.tagline}</p>
+  <ul class="project-tags">
+    {project.data.stack.map((tag) => (
+      <li>
+        <a class="tag-link" href={`/projects/tag/${slugifyTag(tag)}`}>
+          {tag}
+        </a>
+      </li>
+    ))}
+  </ul>
+
+  {visibleLinks.length > 0 && (
+    <p class="project-links">
+      {visibleLinks.map((link) => (
+        <a class="project-link-button" href={link.url}>
+          {link.label}
+        </a>
+      ))}
+    </p>
+  )}
+
+  <Content />
+</BaseLayout>

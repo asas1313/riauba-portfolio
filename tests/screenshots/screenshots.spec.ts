@@ -79,4 +79,54 @@ test.describe("documentation screenshots", () => {
       fullPage: true,
     });
   });
+
+  test("projects catalogue page, light scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/projects");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}projects-light.png`,
+      fullPage: true,
+    });
+  });
+
+  test("projects catalogue page, dark scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto("/projects");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}projects-dark.png`,
+      fullPage: true,
+    });
+  });
+
+  test("project detail page (atsidek), light scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/projects/atsidek");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}project-detail-light.png`,
+      fullPage: true,
+    });
+  });
+
+  test("project tag filter page (java), light scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/projects/tag/java");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}project-tag-light.png`,
+      fullPage: true,
+    });
+  });
+
+  test("how this site was built page, light scheme", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/how-this-site-was-built");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.screenshot({
+      path: `${imgDir}how-this-site-was-built-light.png`,
+      fullPage: true,
+    });
+  });
 });

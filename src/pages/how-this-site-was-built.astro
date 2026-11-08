@@ -1,0 +1,62 @@
+---
+import BaseLayout from "../components/BaseLayout.astro";
+import { getSpecIndex } from "../lib/specs.ts";
+
+const specs = getSpecIndex();
+---
+
+<BaseLayout
+  title="How this site was built — Andrius Riauba"
+  description="How riauba.org is built: a spec-to-deploy AI delivery pipeline, with every spec, its status and its merged pull request."
+  path="/how-this-site-was-built"
+>
+  <h1>How this site was built</h1>
+
+  <p>
+    This site is built from a written specification for each feature, not from
+    an open-ended conversation. Every change follows the same pipeline: a short
+    spec describing the goal and its acceptance criteria, a plan mapping each
+    acceptance criterion to tests, test-first implementation, an independent
+    test pass, a code review, and a documentation update — in that order, for
+    every spec.
+  </p>
+
+  <p>
+    Two steps require a human to explicitly approve before anything moves
+    forward. First, the plan itself: before any code is written, Andrius reviews
+    and approves the implementation plan (or sends it back with amendments).
+    Second, the pull request: every spec lands as its own PR, reviewed before
+    merge, and nothing deploys automatically from a merge — production deploys
+    are a separate, manual, one-click step. Nothing ships without both of those
+    gates.
+  </p>
+
+  <p>
+    Each spec's full history — every phase, how many iterations it took, and any
+    bugs found along the way — is recorded in its own ship log under{" "}
+    <code>docs/specs/</code>. The table below lists every spec in that
+    directory, in order, with a link to its merged pull request where one
+    exists.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Spec</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>PR</th>
+      </tr>
+    </thead>
+    <tbody>
+      {specs.map((spec) => (
+        <tr>
+          <td>{String(spec.number).padStart(3, "0")}</td>
+          <td>{spec.title}</td>
+          <td>{spec.status}</td>
+          <td>{spec.pr && <a href={spec.pr}>PR</a>}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</BaseLayout>

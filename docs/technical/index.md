@@ -1,14 +1,15 @@
 # Technical documentation
 
 _Architecture, module responsibilities, configuration, runbook — for riauba.org as implemented
-by spec 001 (site foundation and home page) and spec 002 (CV page and PDF)._
+by spec 001 (site foundation and home page), spec 002 (CV page and PDF) and spec 003 (projects
+catalogue and detail pages)._
 
 !!! note "Scope"
-    This describes what is built today: the static site skeleton, home page, and the CV page
-    and downloadable PDF (`/cv`, `/cv/print`). The projects listing and detail pages
-    (/projects, /projects/&lt;slug&gt;) and the "How this site was built" page do **not** exist
-    yet — the header links to them intentionally, and they currently 404. They land in specs
-    003–004.
+    This describes what is built today: the static site skeleton, home page, the CV page and
+    downloadable PDF (`/cv`, `/cv/print`), and the projects catalogue, tag filter and detail
+    pages plus the "How this site was built" page (`/projects`, `/projects/tag/<tag>`,
+    `/projects/<slug>`, `/how-this-site-was-built`). Hosting and deployment are spec 004's
+    scope — not built on this branch.
 
 ## Architecture overview
 
@@ -29,22 +30,36 @@ flowchart TD
         projmd["projects/*.md<br/>(one file per project)"]
     end
 
+    subgraph docsspecs["docs/specs/ (repo root)"]
+        specfiles["NNN-*.md<br/># NNN – Title / Status: ... / PR: &lt;url&gt;"]
+    end
+
     subgraph lib["src/lib/"]
+        todots["todo.ts<br/>TODO_PATTERN / isTodoMarked()"]
         cvts["cv.ts<br/>loads cv.yaml via Vite ?raw import"]
         cvschema["cv.schema.ts<br/>Zod schema + parseCv()"]
         cvpublishts["cv.publish.ts<br/>cvForBuild (TODO-stripping)"]
         structureddatats["structured-data.ts<br/>buildPersonJsonLd() / toSafeJsonLd()"]
-        projectsts["projects.ts<br/>getFeaturedProjectsSorted()"]
+        projectsts["projects.ts<br/>getAllProjectsSorted() / getFeaturedProjectsSorted()<br/>slugifyTag() / getAllTagSlugs() / getProjectsByTagSlug()"]
+        projectlinksts["project-links.ts<br/>getVisibleProjectLinks()"]
+        markdowntodots["markdown-todo.ts<br/>removeTodoParagraphs() / createSatteriTodoParagraphPlugin()"]
+        specsts["specs.ts<br/>getSpecIndex()"]
         seots["seo.ts<br/>buildPageSeo()"]
     end
 
     contentconfig["src/content.config.ts<br/>defineCollection('projects')<br/>glob() loader + Zod schema"]
+    astroconfig["astro.config.mjs<br/>integration wires markdown.processor:<br/>satteri({ mdastPlugins: [...] })"]
 
     subgraph pages["src/pages/ + src/components/"]
         indexastro["index.astro"]
         cvastro["cv.astro"]
         cvprintastro["cv/print.astro"]
         cvcontentastro["CvContent.astro"]
+        projectsindexastro["projects/index.astro"]
+        projectstagastro["projects/tag/[tag].astro"]
+        projectslugastro["projects/[slug].astro"]
+        projectcardastro["ProjectCard.astro"]
+        howbuiltastro["how-this-site-was-built.astro"]
         notfound["404.astro"]
         baselayout["BaseLayout.astro<br/>Header + Footer + SEO tags"]
     end
@@ -57,10 +72,14 @@ flowchart TD
     cvyaml -->|"?raw string"| cvts
     cvts --> cvschema
     cvschema -->|"throws on invalid content<br/>(fails the build loudly)"| cvts
+    todots --> cvpublishts
+    todots --> projectlinksts
     cvts --> cvpublishts
 
     projmd -->|"glob('*.md')"| contentconfig
     contentconfig -->|"validates frontmatter<br/>against Zod schema"| contentconfig
+    markdowntodots -->|"mdastPlugins: [createSatteriTodoParagraphPlugin(...)]"| astroconfig
+    astroconfig -->|"renders project bodies<br/>(entry.rendered, cached at content-sync time)"| contentconfig
 
     cvpublishts --> indexastro
     cvpublishts --> cvastro
@@ -71,15 +90,30 @@ flowchart TD
     cvprintastro --> cvcontentastro
     contentconfig --> projectsts
     projectsts --> indexastro
+    projectsts --> projectsindexastro
+    projectsts --> projectstagastro
+    projectsts --> projectcardastro
+    projectlinksts --> projectslugastro
+    contentconfig --> projectslugastro
+    docsspecs -->|"import.meta.glob('/docs/specs/*.md', ?raw)"| specsts
+    specsts --> howbuiltastro
     seots --> baselayout
     baselayout --> indexastro
     baselayout --> cvastro
     baselayout --> notfound
+    baselayout --> projectsindexastro
+    baselayout --> projectstagastro
+    baselayout --> projectslugastro
+    baselayout --> howbuiltastro
 
     indexastro --> astrobuild
     cvastro --> astrobuild
     cvprintastro --> astrobuild
     notfound --> astrobuild
+    projectsindexastro --> astrobuild
+    projectstagastro --> astrobuild
+    projectslugastro --> astrobuild
+    howbuiltastro --> astrobuild
     astrobuild --> dist
     dist --> buildpdf
     buildpdf --> pdf
@@ -107,10 +141,24 @@ Key properties of this build:
 | --- | --- |
 | `cv.schema.ts` | Zod schema (`cvSchema`) matching the shape of `content/cv.yaml`; `parseCv(data)` validates and throws a readable, multi-issue error on failure. Exports the inferred `Cv`, `Profile` and `Work` types. |
 | `cv.ts` | Loads `content/cv.yaml` (via a Vite `?raw` import, parsed with the `yaml` package) and validates it with `parseCv()` once at module load time, exporting the typed `cv` constant. Also exports `getWorkReverseChronological(work)`, which sorts work entries by `endDate` descending (an ongoing role with no `endDate` sorts as most recent), tie-broken by `startDate` descending. |
-| `cv.publish.ts` | The site's single TODO-filtering mechanism (spec 002) — see [TODO filtering](#todo-filtering-cvpublishts) below. Exports `cvForBuild`, the one `Cv` value every page/component should import instead of the raw `cv` export from `cv.ts`. |
+| `cv.publish.ts` | The site's TODO-filtering mechanism for `content/cv.yaml` (spec 002) — see [TODO filtering](#todo-filtering-cvpublishts) below. Exports `cvForBuild`, the one `Cv` value every page/component should import instead of the raw `cv` export from `cv.ts`. |
+| `todo.ts` | Shared `TODO_PATTERN` (`/\bTODO\b/`, whole-word, case-sensitive) and `isTodoMarked(value)` helper (spec 003), extracted from `cv.publish.ts` so `project-links.ts` reuses the exact same matching rule. |
 | `structured-data.ts` | `buildPersonJsonLd(cv)` maps `cv.basics` onto a [schema.org `Person`](https://schema.org/Person) object (name, jobTitle, email, url, address, `sameAs` profile URLs, description) for the `/cv` page's JSON-LD. `toSafeJsonLd(value)` serializes a value with `JSON.stringify` and escapes every literal `<` as `<` before it is injected into a `<script type="application/ld+json">` via `set:html`, so a CV field containing literal `<script>` text can never prematurely close the surrounding tag. |
-| `projects.ts` | `getFeaturedProjectsSorted(entries)` — pure helper that filters a list of `projects` collection entries down to `featured: true` and sorts them by `order` ascending. |
+| `projects.ts` | `getFeaturedProjectsSorted(entries)`/`getAllProjectsSorted(entries)` — pure helpers that sort `projects` collection entries by `order` ascending, filtered to `featured: true` or not filtered at all (spec 003, AC-1). `slugifyTag(tag)` lowercases a stack tag and collapses non-alphanumeric runs into single, trimmed hyphens. `getAllTagSlugs(entries)` groups every project under each of its tags' slug (AC-3) and **throws** a readable error — rather than silently merging — if two distinct tag labels slugify to the same non-empty slug, or if a label slugifies to the empty string. `getProjectsByTagSlug(entries, slug)` filters to projects whose `stack` includes a tag matching that slug. |
+| `project-links.ts` | `getVisibleProjectLinks(links)` (spec 003, AC-4) — returns the ordered (live, docs, repo) link buttons a project detail page should render, dropping any value that is `null` or TODO-marked (via `todo.ts`'s `isTodoMarked`). **Unconditional**: identical in `astro dev` and `astro build`, unlike `markdown-todo.ts` below — a link button that literally read "TODO" would otherwise be visible (and clickable, pointing nowhere useful) in local dev. |
+| `markdown-todo.ts` | TODO-*paragraph* stripping for `content/projects/*.md` bodies (spec 003, AC-5) — see [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) below. |
+| `specs.ts` | `getSpecIndex()` (spec 003, AC-6) — reads every `docs/specs/<NNN>-*.md` file (excluding `*.plan.md`/`*.log.md`/`_TEMPLATE.md`) via a Vite `import.meta.glob` raw import, parsing `{ number, title, status, pr? }` from each file's `# NNN – Title` / `Status: ...` / optional `PR: <url>` header lines, sorted ascending by number. Throws a readable error if a file has no parseable heading/status line, or if its filename's leading number disagrees with its own heading's. |
 | `seo.ts` | `buildPageSeo(site, { title, description, path })` — builds the `<title>`, meta description, canonical URL and Open Graph tag values for a page. `resolveCanonicalUrl` guarantees the canonical/OG URL always stays on the configured `site` origin (collapsing protocol-relative `//host` paths and stripping any foreign scheme/host from an absolute URL before resolving), throwing rather than ever emitting an off-site URL. No `og:image` is set yet. |
+
+**Two different TODO-handling code paths exist side by side**, and deliberately share no code:
+`cv.publish.ts`'s whole-*field*, schema-aware stripping for `content/cv.yaml` (a typed object
+tree, filtered at page-render time) and `markdown-todo.ts`'s whole-*paragraph*, mdast-aware
+stripping for `content/projects/*.md` bodies (a markdown AST, filtered at content-sync time) —
+see [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) and
+[ADR-0003](../adr/0003-project-body-todo-stripping.md) for why these can't share a single
+implementation. `project-links.ts`'s link-button filter is a third, much smaller TODO check
+(a single string equality/pattern test, no tree at all) that is unconditional rather than
+prod-build-only — see its row above.
 
 ### TODO filtering (`cv.publish.ts`)
 
@@ -166,6 +214,61 @@ Behaviour:
   dot-paths, so a production build that silently drops content is still visible in the build
   log.
 
+### Markdown body TODO stripping (`markdown-todo.ts`)
+
+Spec 003's AC-5 requires that any top-level paragraph in a `content/projects/*.md` body
+starting with the literal word `TODO` is omitted from the production build, with a build
+warning — the same marker and whole-word/case-sensitive rule as `cv.publish.ts`, but applied to
+a markdown AST instead of a parsed JS object tree, because by the time a page could mutate an
+entry's raw body, Astro has already rendered it to cached HTML — see
+[ADR-0003](../adr/0003-project-body-todo-stripping.md) for the full reasoning.
+
+- `removeTodoParagraphs(tree)` walks an mdast root's *direct* children only; for each top-level
+  `paragraph` it computes the **recursively-joined plain text** (concatenating every descendant
+  text node's `.value`, depth-first, across all inline children — so a leading `**TODO**` bold
+  run is caught, not just a bare leading text node) and removes the paragraph if that text
+  matches `/^TODO\b/`. A TODO paragraph nested inside a list item or blockquote is left
+  untouched — a documented limitation, not a bug (see ADR-0003's Consequences).
+- `remarkStripTodoParagraphs({ enabled, warn })` wraps that in the classic unified/remark
+  "attacher" shape the mechanism was originally designed around.
+- **The real build wiring doesn't use that classic shape**, because Astro 7.4 (the version this
+  repo pins) ships **Sätteri**, not the classic `unified`/`remark` pipeline, as its *default*
+  Markdown processor, and `markdown.remarkPlugins` throws a config-validation error unless the
+  separate `@astrojs/markdown-remark` package is installed too — confirmed by actually running
+  `astro build` with it configured (see ADR-0003's Addendum). Production wiring instead goes
+  through `createSatteriTodoParagraphPlugin`, targeting Sätteri's own native mdast-plugin shape:
+  a `before(root, context)` hook (run once per document, before Sätteri's own visitors) that
+  removes each matching top-level paragraph via `context.removeNode(node)` (Sätteri's tree is
+  read-only from plugin code; there is no `tree.children` array to reassign).
+- `astro.config.mjs` registers the stripping via a small inline integration's `astro:config:setup`
+  hook (`markdown.processor: satteri({ mdastPlugins: [createSatteriTodoParagraphPlugin({ enabled:
+  command === "build", warn: () => {} }) ] })`), **not** a functional
+  `defineConfig(({ command }) => ({ ... }))` default export — Astro's own `defineConfig` is a
+  plain identity function and never calls a function passed as the config's default export
+  (also confirmed empirically; see ADR-0003's Addendum). TODOs render as-is in `astro dev`, are
+  stripped in `astro build`, mirroring `cv.publish.ts`'s `import.meta.env.PROD` gating via the
+  config-time `command` equivalent.
+- **The build warning is emitted from a separate, cache-independent path, not from the Sätteri
+  plugin above.** Astro's content-layer glob loader skips re-rendering a file (and therefore
+  skips re-invoking the Sätteri plugin's `before` hook) whenever the file's on-disk content
+  digest is unchanged since the last sync — correct for reusing already-rendered HTML, but wrong
+  for a side-effecting warning: a second `astro build` in a row against an unchanged, warm
+  content-layer cache would otherwise never warn again, even though the (still correctly
+  stripped) output is unchanged. So `createSatteriTodoParagraphPlugin`'s own `warn` is wired as a
+  no-op in production, and the same integration also hooks `astro:build:start` — which Astro
+  calls unconditionally, once per `astro build`, before any content-layer sync happens — to call
+  `warnAboutTodoParagraphsInFiles`, which scans `content/projects/*.md` directly off disk and
+  counts top-level TODO paragraphs via `countTopLevelTodoParagraphsInMarkdownBody`. That counter
+  parses each file's body with `satteri`'s own `markdownToMdast` (the same native mdast parser
+  Astro's `satteri()` processor uses) and runs the result through `createSatteriTodoParagraphPlugin`
+  itself — the literal same plugin that performs the real stripping — reading back its count via
+  an `onRemoved` callback. There is exactly one piece of logic deciding "is this a top-level TODO
+  paragraph"; the warning and the actual stripped output cannot disagree. (An earlier version of
+  this counter was a bespoke, dependency-free text-level block splitter, independent of mdast —
+  it disagreed with the real plugin on a loose-list lazy continuation and a setext heading, a bug
+  found in review 2 and fixed by this mdast-based rewrite.) This fires on every build, cold or
+  warm cache alike; see ADR-0003's Addendum for the investigation.
+
 ### `src/content.config.ts`
 
 Defines the `projects` Astro content collection: a `glob()` loader with
@@ -180,10 +283,10 @@ closed enum — the four existing project files already use three different valu
 | Component | Responsibility |
 | --- | --- |
 | `BaseLayout.astro` | The shared HTML shell: `<head>` with charset/viewport/title/meta description/canonical/Open Graph tags (via `seo.ts`) and favicon, plus `Header`, a `<main>` slot, and `Footer`. Every page renders through this layout. |
-| `Header.astro` | Site navigation: Home, Projects, CV, "How this site was built", and a direct "Download CV (PDF)" link to `/andrius-riauba-cv.pdf`. The CV links are live (`/cv`, the PDF); Projects and "How this site was built" still point at pages that don't exist until specs 003–004 ship (they currently 404). |
+| `Header.astro` | Site navigation: Home, Projects, CV, "How this site was built", and a direct "Download CV (PDF)" link to `/andrius-riauba-cv.pdf`. Every link is live. |
 | `Footer.astro` | Reads `cvForBuild.basics.email` and the LinkedIn profile (found by matching `network` case-insensitively, after TODO-filtering has already run) to render a `mailto:` link and LinkedIn link, plus `© <current year> <cvForBuild.basics.name>`. |
 | `CvContent.astro` | Renders the full CV body (name/label/contact line/profiles/remote line, Summary, Experience, Skills, Education, Languages, Certificates — each section only shown when its underlying list/string is non-empty) from a `Cv` passed in as a prop. Shared, unstyled-by-page-chrome markup used identically by both `/cv` (inside `BaseLayout`) and `/cv/print` (standalone, for the PDF), so the two can never drift apart. Work entries are pre-sorted by the caller via `getWorkReverseChronological`. |
-| `ProjectCard.astro` | Renders one featured-project list item: a link to `/projects/<id>` (the collection entry's slug, derived by Astro from the markdown filename) with the project's `title`, and its `tagline`. |
+| `ProjectCard.astro` | Renders one project list item (used by the home page's featured list, `/projects` and `/projects/tag/<tag>`): a link to `/projects/<id>`, the `title`, a generic status badge (`project.data.status`, one visual style regardless of the status string), the `tagline`, and each `stack` entry as a link to `/projects/tag/<slugifyTag(tag)>` (spec 003, AC-1/AC-3). |
 
 ### `src/pages/`
 
@@ -192,6 +295,10 @@ closed enum — the four existing project files already use three different valu
 | `index.astro` | The home page. Reads `cvForBuild` to render name/label/summary/remote line and profile links (TODO-filtered per `cv.publish.ts`); reads the `projects` collection via `getCollection("projects")` and `getFeaturedProjectsSorted` to render featured projects in `order`. Builds its own short SEO description distinct from the full CV summary. |
 | `cv.astro` | The `/cv` page. Renders a "Download CV (PDF)" button linking to `/andrius-riauba-cv.pdf`, then `<CvContent cv={cvForBuild} />`, through the normal `BaseLayout` (full header/footer/nav). Also passes `buildPersonJsonLd(cvForBuild)` to `BaseLayout` as `structuredData`, which serializes it into a `<script type="application/ld+json">` tag via `toSafeJsonLd`. |
 | `cv/print.astro` | The print-optimised source for the generated PDF (spec 002, decision #4): a minimal standalone HTML document — no `Header`/`Footer`/nav — rendering the same `<CvContent cv={cvForBuild} />`, with `<meta name="robots" content="noindex">` and a `<link rel="canonical">` pointing back at `/cv` so it is never indexed as a separate page. Imports `src/styles/print.css` in addition to the shared `global.css` for print-specific layout (e.g. page-break control). This is the exact URL `scripts/build-pdf.mjs` loads and prints to PDF; it is not meant to be browsed directly. |
+| `projects/index.astro` | The `/projects` catalogue page (spec 003, AC-1): every project from `getCollection("projects")`, sorted via `getAllProjectsSorted`, rendered as `ProjectCard`s. |
+| `projects/tag/[tag].astro` | Static `/projects/tag/<tag>` filter pages (spec 003, AC-3): `getStaticPaths()` generates one page per `getAllTagSlugs()` group (`{ slug, label, projects }`), rendering only that group's projects — filtering needs zero client-side JavaScript. |
+| `projects/[slug].astro` | The `/projects/<slug>` detail page (spec 003, AC-4/AC-5): `getStaticPaths()` from every collection entry; renders the markdown body via `astro:content`'s `render(entry)` (already TODO-paragraph-stripped in production, per `markdown-todo.ts`), plus a link button per `getVisibleProjectLinks(project.data.links)` entry. |
+| `how-this-site-was-built.astro` | The `/how-this-site-was-built` page (spec 003, AC-6): hand-written prose on the spec→plan→implement→test→review→docs pipeline and its two human approval gates, plus a table built from `getSpecIndex()` (number, title, status, PR link when present). |
 | `404.astro` | A styled not-found page through the same `BaseLayout`, with a link back to `/`. |
 
 ### Styling and fonts
@@ -213,6 +320,7 @@ All build-time configuration lives in `astro.config.mjs`:
 export default defineConfig({
   site: "https://riauba.org",
   output: "static",
+  integrations: [todoParagraphStrippingIntegration()],
 });
 ```
 
@@ -221,6 +329,18 @@ export default defineConfig({
   canonical URL stays on.
 - `output: "static"` — no server-side rendering, no adapter; `astro build` emits static files
   to `dist/`.
+- `integrations: [todoParagraphStrippingIntegration()]` — a small inline integration (spec 003,
+  not a separate npm package) whose `astro:config:setup` hook sets `markdown.processor:
+  satteri({ mdastPlugins: [createSatteriTodoParagraphPlugin({ enabled: command === "build",
+  warn: () => {} }) ] })`, gating AC-5's TODO-paragraph stripping on the real CLI command. The
+  Sätteri plugin's own `warn` is a no-op in production — the `astro:build:start` hook (see
+  [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) below) is the
+  sole source of the AC-5 build warning. This is an inline integration, rather than the plain
+  object/functional forms `defineConfig` might suggest, because Astro's `defineConfig` never
+  invokes a function passed as its default export — `astro:config:setup` is the documented way
+  to read `command` — see
+  [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) and
+  [ADR-0003](../adr/0003-project-body-todo-stripping.md)'s Addendum.
 
 There are no environment variables consumed by the Astro build itself today. `make deploy` and
 `make smoke` (see below) read deployment-time shell variables (`DEPLOY_USER`, `DEPLOY_HOST`,
@@ -300,9 +420,13 @@ Full rationale and alternatives considered are in
 - **`make docs` fails with a strict mkdocs warning** — usually a broken internal link or a
   heading referenced by the nav that doesn't exist; `mkdocs build --strict` turns every warning
   into a build failure by design.
-- **A nav link (Projects, "How this site was built") 404s** — expected today; those pages
-  don't exist until specs 003–004 ship. (`CV` and `Download CV (PDF)` are live — if either of
-  those 404s, something is actually broken; see the `build:pdf` section below.)
+- **Build fails with `getAllTagSlugs: tags "..." and "..." both slugify to "..."`** — two
+  distinct stack tags across `content/projects/*.md` collapse to the same `/projects/tag/<slug>`
+  route (e.g. two spellings of the same technology). Rename one of them so they slugify
+  differently.
+- **Build fails with `getAllTagSlugs: tag "..." ... slugifies to an empty string`** — a stack
+  tag is made up entirely of non-alphanumeric characters (e.g. just punctuation), so it has no
+  usable route segment. Rename the tag to include at least one letter or digit.
 - **`build:pdf` fails with "preview server ... did not become ready within 30000ms"** —
   something is already bound to port 4323 (a leftover `astro preview` process from a prior
   interrupted `build-pdf.mjs` run is the usual cause), or `astro build` didn't run first so

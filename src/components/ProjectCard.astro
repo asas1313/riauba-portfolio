@@ -1,5 +1,6 @@
 ---
 import type { CollectionEntry } from "astro:content";
+import { slugifyTag } from "../lib/projects.ts";
 
 interface Props {
   project: Pick<CollectionEntry<"projects">, "id" | "data">;
@@ -12,5 +13,15 @@ const { project } = Astro.props;
   <a data-testid="project-link" href={`/projects/${project.id}`}>
     {project.data.title}
   </a>
+  <span class="project-badge">{project.data.status}</span>
   <p>{project.data.tagline}</p>
+  <ul class="project-tags">
+    {project.data.stack.map((tag) => (
+      <li>
+        <a class="tag-link" href={`/projects/tag/${slugifyTag(tag)}`}>
+          {tag}
+        </a>
+      </li>
+    ))}
+  </ul>
 </li>
