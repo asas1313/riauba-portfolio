@@ -95,3 +95,93 @@ export function readFeaturedProjectsSorted(): ProjectEntry[] {
     .filter((project) => project.featured)
     .sort((a, b) => a.order - b.order);
 }
+
+/** Mirrors src/lib/projects.ts's getAllProjectsSorted. Duplicated for the
+ * same reason as readWorkReverseChronological above: e2e specs can't
+ * import src/lib/*.ts directly. */
+export function readAllProjectsSorted(): ProjectEntry[] {
+  return [...readProjects()].sort((a, b) => a.order - b.order);
+}
+
+/** Mirrors src/lib/projects.ts's slugifyTag. */
+export function slugifyTag(tag: string): string {
+  return tag
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export interface TagGroup {
+  slug: string;
+  label: string;
+  projects: ProjectEntry[];
+}
+
+/** Mirrors src/lib/projects.ts's getAllTagSlugs (read-only mirror; does not
+ * re-implement the build's collision/empty-slug error checks, since those
+ * are already covered by tests/unit/projects.test.ts). */
+export function readTagGroups(): TagGroup[] {
+  const bySlug = new Map<string, TagGroup>();
+  for (const project of readProjects()) {
+    for (const label of project.stack) {
+      const slug = slugifyTag(label);
+      const existing = bySlug.get(slug);
+      if (existing) {
+        existing.projects.push(project);
+      } else {
+        bySlug.set(slug, { slug, label, projects: [project] });
+      }
+    }
+  }
+  return [...bySlug.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+// Mirrors src/lib/todo.ts's TODO_PATTERN.
+const TODO_PATTERN = /\bTODO\b/;
+
+export type ProjectLinkKind = "live" | "docs" | "repo";
+
+/** Mirrors src/lib/project-links.ts's getVisibleProjectLinks. */
+export function readVisibleProjectLinkKinds(
+  links: ProjectEntry["links"],
+): ProjectLinkKind[] {
+  return (["live", "docs", "repo"] as const).filter((kind) => {
+    const url = links[kind];
+    return url !== null && !TODO_PATTERN.test(url);
+  });
+}
+
+const specsDir = fileURLToPath(
+  new URL("../../../docs/specs/", import.meta.url),
+);
+
+export interface SpecIndexEntry {
+  number: number;
+  title: string;
+  status: string;
+  pr?: string;
+}
+
+/** Mirrors src/lib/specs.ts's getSpecIndex, reading docs/specs/*.md
+ * directly with fs instead of a Vite import.meta.glob (e2e specs can't
+ * import src/lib/*.ts directly). */
+export function readSpecIndex(): SpecIndexEntry[] {
+  return readdirSync(specsDir)
+    .filter((filename) => /^\d{3}-[\w-]+\.md$/.test(filename))
+    .map((filename) => {
+      const raw = readFileSync(`${specsDir}${filename}`, "utf-8");
+      const h1 = /^#\s+(\d{3})\s+–\s+(.+?)\s*$/m.exec(raw);
+      const status = /^Status:\s*(.+?)\s*(?:·|$)/m.exec(raw);
+      const pr = /^PR:\s*(\S+)\s*$/m.exec(raw);
+      if (!h1 || !status) {
+        throw new Error(`No parseable header found in ${filename}`);
+      }
+      return {
+        number: Number(h1[1]),
+        title: h1[2],
+        status: status[1],
+        pr: pr ? pr[1] : undefined,
+      };
+    })
+    .sort((a, b) => a.number - b.number);
+}
