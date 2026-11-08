@@ -8,7 +8,8 @@
     "build": "astro build",
     "build:pdf": "node scripts/build-pdf-stub.mjs",
     "preview": "astro preview --ignore-lock",
-    "check": "astro check"
+    "check": "astro check",
+    "capture-screenshots": "playwright test --config=playwright.screenshots.config.ts"
   },
   "dependencies": {
     "astro": "^7.4.7"

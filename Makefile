@@ -1,4 +1,4 @@
-.PHONY: setup test e2e lint lint-changed format format-file security docs build deploy smoke
+.PHONY: setup test e2e screenshots lint lint-changed format format-file security docs build deploy smoke
 
 setup:
 	npm ci
@@ -9,6 +9,12 @@ test:
 
 e2e: build
 	npx playwright test
+
+# Explicit, opt-in regeneration of docs/user-guide/img/*.png. Not part of
+# `make e2e`/CI: it overwrites tracked screenshots and must only run when
+# someone deliberately asks for it.
+screenshots: build
+	npm run capture-screenshots
 
 lint:
 	npx astro check && npx eslint . && npx prettier --check .

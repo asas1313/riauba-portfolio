@@ -110,6 +110,31 @@ describe("buildPageSeo", () => {
     expect(seo.canonical).toBe("https://riauba.org/evil.example.com/phish");
   });
 
+  it("fix: a fully-qualified absolute https:// foreign URL as path cannot escape riauba.org", () => {
+    const seo = buildPageSeo(site, {
+      title: "t",
+      description: "d",
+      path: "https://evil.example.com/phish",
+    });
+    // The scheme and host of a fully-qualified absolute URL passed as `path`
+    // must be discarded; only the pathname is kept and resolved against
+    // `site`, so the canonical/OG URL always stays on riauba.org.
+    expect(seo.canonical.startsWith("https://riauba.org")).toBe(true);
+    expect(seo.canonical).toBe("https://riauba.org/phish");
+    expect(seo.og.url).toBe("https://riauba.org/phish");
+  });
+
+  it("fix: a fully-qualified absolute http:// foreign URL as path cannot escape riauba.org", () => {
+    const seo = buildPageSeo(site, {
+      title: "t",
+      description: "d",
+      path: "http://evil.example.com/phish",
+    });
+    expect(seo.canonical.startsWith("https://riauba.org")).toBe(true);
+    expect(seo.canonical).toBe("https://riauba.org/phish");
+    expect(seo.og.url).toBe("https://riauba.org/phish");
+  });
+
   it("builds matching Open Graph tags", () => {
     const seo = buildPageSeo(site, {
       title: "My title",

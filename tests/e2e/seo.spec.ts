@@ -44,6 +44,17 @@ test.describe("SEO metadata", () => {
     expect(seo.canonical).toBe("https://riauba.org/");
   });
 
+  test("home page meta description is a short, dedicated summary, not the full CV summary", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const seo = await readSeoTags(page);
+    // Search engines typically truncate meta descriptions around 150-160
+    // characters; the full multi-sentence CV summary (shown in the page
+    // body) is far longer than that and must not be reused verbatim here.
+    expect(seo.description?.length ?? 0).toBeLessThanOrEqual(160);
+  });
+
   test("404 page has complete SEO tags with a matching canonical URL", async ({
     page,
   }) => {

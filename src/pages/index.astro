@@ -8,11 +8,15 @@ import { getFeaturedProjectsSorted } from "../lib/projects.ts";
 const visibleProfiles = getVisibleProfiles(cv.basics.profiles);
 const allProjects = await getCollection("projects");
 const featuredProjects = getFeaturedProjectsSorted(allProjects);
+// A short, dedicated description for search engines (typically truncated
+// around 150-160 chars), distinct from the full `cv.basics.summary` shown
+// in the page body below.
+const shortDescription = `${cv.basics.label} — portfolio, CV and project case studies.`;
 ---
 
 <BaseLayout
   title={`${cv.basics.name} — ${cv.basics.label}`}
-  description={cv.basics.summary.trim()}
+  description={shortDescription}
   path="/"
 >
   <h1>{cv.basics.name}</h1>

@@ -28,7 +28,8 @@ We need both: (a) a build that fails loudly with a readable error on invalid con
 
 1. `content/projects/*.md` is modelled as an Astro content collection named `projects`,
    defined in `src/content.config.ts` using the `glob()` loader with
-   `base: "../content/projects"` (relative to `src/`) and `pattern: "*.md"`. Its schema
+   `base: "./content/projects"` (relative to the project root, the directory containing
+   `astro.config.mjs` — not relative to `src/`) and `pattern: "*.md"`. Its schema
    is a Zod object (`title`, `tagline`, `status`, `order`, `featured`, `links`, `stack`)
    matching the frontmatter actually present in the four existing project files. Astro
    validates every entry against this schema at build time and fails the build with a
