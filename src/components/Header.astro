@@ -87,13 +87,27 @@ const currentPath = Astro.url.pathname.replace(/(?!^)\/$/, "");
         : "light";
     }
 
-    function applyTheme(theme) {
-      document.documentElement.dataset.theme = theme;
-      document.documentElement.style.colorScheme = theme;
+    function updateButton(theme) {
       toggle.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
     }
 
-    applyTheme(currentEffectiveTheme());
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme;
+      updateButton(theme);
+    }
+
+    // On load, only reflect the current effective theme on the button
+    // itself (aria-pressed/icon) -- never call applyTheme() here. Doing so
+    // would pin dataset.theme/style.colorScheme on every page view, even
+    // for a visitor who never touched the toggle and has nothing stored,
+    // freezing the system preference and breaking live
+    // prefers-color-scheme repaints for the rest of that page view.
+    // BaseLayout.astro's head script already set dataset.theme before this
+    // script ever runs *if and only if* an explicit choice was previously
+    // stored -- when it wasn't, dataset.theme/style.colorScheme must stay
+    // untouched so the CSS media query alone keeps driving the theme.
+    updateButton(currentEffectiveTheme());
 
     toggle.addEventListener("click", function () {
       const next = currentEffectiveTheme() === "dark" ? "light" : "dark";

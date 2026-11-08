@@ -164,6 +164,42 @@ test.describe("theme toggle", () => {
     expect(pageErrors).toEqual([]);
   });
 
+  // Reviewer finding (spec 005 review): Header's script must not eagerly
+  // call the full theme-pinning logic (dataset.theme/style.colorScheme) on
+  // every page load -- only the click handler may do that. When no
+  // preference has ever been stored/clicked, the page must keep reacting
+  // live to OS-level prefers-color-scheme changes within the same tab,
+  // exactly like before this spec (CSS media query only, no JS pin).
+  test("a live OS theme change still repaints the page when no preference has been set or clicked", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/");
+    await expect(page.locator(".theme-toggle")).toBeVisible();
+
+    const themeAttrAfterLoad = await page.evaluate(
+      () => document.documentElement.dataset.theme,
+    );
+    expect(themeAttrAfterLoad).toBeUndefined();
+
+    const before = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--color-bg"),
+    );
+
+    await page.emulateMedia({ colorScheme: "dark" });
+
+    const after = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--color-bg"),
+    );
+
+    expect(after.trim()).not.toBe(before.trim());
+
+    const themeAttrAfterOsChange = await page.evaluate(
+      () => document.documentElement.dataset.theme,
+    );
+    expect(themeAttrAfterOsChange).toBeUndefined();
+  });
+
   test("pre-seeding localStorage with dark applies data-theme before the Header/Footer paint (no flash)", async ({
     page,
   }) => {
