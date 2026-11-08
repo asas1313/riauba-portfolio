@@ -1,3 +1,4 @@
+import { markdownToHtml } from "satteri";
 import { describe, expect, it, vi } from "vitest";
 import {
   countTopLevelTodoParagraphsInMarkdownBody,
@@ -280,6 +281,72 @@ describe("countTopLevelTodoParagraphsInMarkdownBody (AC-5, cache-independent pat
   it("is a no-op on a body with no TODO paragraphs", () => {
     const body = "Intro.\n\nMore text.\n";
     expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  // Regression tests for review 2's BLOCKER: the old bespoke blank-line
+  // block splitter disagreed with the real mdast-based Sätteri plugin on
+  // these two shapes (it over-counted a TODO as a top-level paragraph in
+  // both cases), so the build warning and the actual stripped output could
+  // diverge. Both fixtures are the reviewer's own reproduction shapes.
+  // `countTopLevelTodoParagraphsInMarkdownBody` is now driven by the same
+  // mdast parser/plugin (`createSatteriTodoParagraphPlugin`) that performs
+  // the real stripping, so it can no longer disagree with it.
+  it("does not count a TODO line that is a lazy-continuation of a loose list item (CommonMark), even though it is indented only to the list marker's content column", () => {
+    const body =
+      "Some intro paragraph.\n\n" +
+      "- item one\n" +
+      "- item two\n\n" +
+      "  TODO loose-list continuation, indented 2 spaces (list marker width), still part of item two in CommonMark.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+
+  it("does not count a TODO-starting setext heading as a paragraph", () => {
+    const body = "TODO heading text\n===\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+  });
+});
+
+describe("countTopLevelTodoParagraphsInMarkdownBody agrees with the real Sätteri stripping plugin (AC-5, review 2 regression)", () => {
+  // Proves the warning count (`countTopLevelTodoParagraphsInMarkdownBody`)
+  // and the actual production stripping (`createSatteriTodoParagraphPlugin`,
+  // run through Sätteri's real `markdownToHtml` pipeline, exactly as
+  // astro.config.mjs wires it) never disagree, for both of review 2's
+  // previously-divergent shapes: no false-positive warning, no
+  // false-negative strip.
+  function renderWithRealPlugin(body: string) {
+    const warn = vi.fn();
+    const html = markdownToHtml(body, {
+      mdastPlugins: [createSatteriTodoParagraphPlugin({ enabled: true, warn })],
+    });
+    return { html: html.html, warn };
+  }
+
+  it("agrees on the loose-list-continuation shape: no warning, TODO text still rendered", () => {
+    const body =
+      "Some intro paragraph.\n\n" +
+      "- item one\n" +
+      "- item two\n\n" +
+      "  TODO loose-list continuation, indented 2 spaces (list marker width), still part of item two in CommonMark.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+    const { html, warn } = renderWithRealPlugin(body);
+    expect(warn).not.toHaveBeenCalled();
+    expect(html).toContain("TODO loose-list continuation");
+  });
+
+  it("agrees on the setext-heading shape: no warning, TODO heading still rendered", () => {
+    const body = "TODO heading text\n===\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(0);
+    const { html, warn } = renderWithRealPlugin(body);
+    expect(warn).not.toHaveBeenCalled();
+    expect(html).toContain("TODO heading text");
+  });
+
+  it("agrees on a real top-level TODO paragraph: warns once, and the paragraph is stripped from the rendered HTML", () => {
+    const body = "Intro paragraph.\n\nTODO (Andrius): fill this in.\n";
+    expect(countTopLevelTodoParagraphsInMarkdownBody(body)).toBe(1);
+    const { html, warn } = renderWithRealPlugin(body);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(html).not.toContain("TODO");
   });
 });
 
