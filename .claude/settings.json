@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make:*)",
+      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)",
+      "Bash(git commit:*)", "Bash(git checkout -b:*)", "Bash(git switch:*)",
+      "Bash(git push -u origin:*)", "Bash(git push origin:*)",
+      "Bash(gh pr create:*)", "Bash(gh pr view:*)", "Bash(gh pr checks:*)",
+      "Bash(mvn:*)", "Bash(./mvnw:*)", "Bash(npm:*)", "Bash(npx:*)", "Bash(uv:*)",
+      "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(find:*)", "Bash(mkdir:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)", "Bash(git push -f:*)", "Bash(git push origin main:*)",
+      "Bash(git reset --hard:*)", "Bash(rm -rf:*)",
+      "Bash(ssh:*)", "Bash(scp:*)", "Bash(rsync:*)", "Bash(make deploy:*)",
+      "Bash(curl:*)", "Bash(wget:*)",
+      "Read(./.env)", "Read(./.env.*)", "Read(./**/secrets/**)", "Read(./**/*.pem)", "Read(./**/*.key)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit.sh" }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-gate.sh" }]
+      }
+    ]
+  }
+}

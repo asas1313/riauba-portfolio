@@ -1,0 +1,79 @@
+# Single source of truth for the CV page and the generated PDF.
+# Lines marked TODO must be filled in by Andrius. Agents must never invent values here.
+basics:
+  name: "Andrius R."                      # TODO: full surname if you want it public
+  label: "Senior Java Developer · AI Engineer"
+  email: "TODO@riauba.org"
+  url: "https://riauba.org"
+  location: { city: "Vilnius region", countryCode: "LT" }   # TODO: confirm wording
+  remote: "Open to remote / hybrid B2B contracts in Scandinavia and the EU"
+  profiles:
+    - { network: "LinkedIn", url: "https://www.linkedin.com/in/andrius-r" }
+    - { network: "GitHub", url: "TODO" }
+  summary: >
+    Senior Java backend engineer with 8+ years in banking and critical public infrastructure:
+    payments (SEPA, domestic and cross-border clearing), mainframe-to-microservices migration,
+    national registries and investment platforms. Combines hands-on engineering with business
+    analysis and project management experience. Now building AI-powered products and
+    agentic software delivery pipelines with Claude.
+
+work:
+  - name: "Danske Bank"
+    position: "Senior Java Developer"           # TODO: confirm title
+    startDate: "TODO"
+    endDate: "TODO"
+    summary: "Payments modernisation: migration of payment processing from mainframe to Java microservices."
+    highlights:
+      - "Built and migrated payment flows for SEPA, domestic and cross-border clearing."
+      - "Designed Prometheus/Grafana dashboards and alerting for payment services."
+      - "Early adopter of GitHub Copilot in the team."
+      - "TODO: one measurable result (volume, latency, incidents reduced, systems decommissioned)."
+  - name: "Registrų centras"
+    position: "Java Developer"                  # TODO
+    startDate: "TODO"
+    endDate: "TODO"
+    summary: "Development of Lithuania's critical state registries."
+    highlights:
+      - "Identity and access management with Keycloak."
+      - "Oracle and PostgreSQL data layers for high-integrity registry data."
+      - "TODO: measurable result."
+  - name: "SEB"
+    position: "Java Developer"                  # TODO
+    startDate: "TODO"
+    endDate: "TODO"
+    summary: "Investment platform development."
+    highlights:
+      - "TODO: what you built and its impact."
+  - name: "Baltic Amadeus"
+    position: "TODO"
+    startDate: "TODO"
+    endDate: "TODO"
+    highlights:
+      - "Terraform infrastructure: version upgrades and server migration that reduced hosting costs."
+  - name: "Atsidėk (own product)"
+    position: "Founder & Engineer"
+    startDate: "2026-10"
+    url: "https://atsidek.eu"
+    highlights:
+      - "Tax-planning SaaS for Lithuanian self-employed: Spring Boot calculation engine, Python AI assistant on the Claude API."
+
+skills:
+  - { name: "Backend", keywords: ["Java", "Spring Boot", "Microservices", "REST", "Maven"] }
+  - { name: "Payments & banking", keywords: ["SEPA", "Domestic clearing", "Cross-border payments", "Mainframe migration"] }
+  - { name: "Data", keywords: ["PostgreSQL", "Oracle"] }
+  - { name: "Security & identity", keywords: ["Keycloak"] }
+  - { name: "AI engineering", keywords: ["Python", "Claude API", "Claude Code", "Agentic workflows", "LLM-assisted delivery"] }
+  - { name: "Ops & infrastructure", keywords: ["Docker", "Terraform", "Prometheus", "Grafana", "Proxmox", "Cloudflare", "GitHub Actions"] }
+  - { name: "Other", keywords: ["Business analysis", "Project management"] }
+
+education:
+  - institution: "TODO"
+    area: "TODO"
+    studyType: "TODO"
+    endDate: "TODO"
+
+languages:
+  - { language: "Lithuanian", fluency: "Native" }
+  - { language: "English", fluency: "TODO" }
+
+certificates: []    # TODO, optional

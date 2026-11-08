@@ -1,0 +1,22 @@
+site_name: riauba.org – documentation
+docs_dir: docs
+exclude_docs: |
+  specs/
+theme:
+  name: material
+  features: [navigation.sections, search.highlight, content.code.copy]
+  palette:
+    - scheme: default
+      toggle: { icon: material/weather-night, name: Dark mode }
+    - scheme: slate
+      toggle: { icon: material/weather-sunny, name: Light mode }
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - { name: mermaid, class: mermaid, format: !!python/name:pymdownx.superfences.fence_code_format }
+nav:
+  - Home: index.md
+  - User guide: user-guide/index.md
+  - Technical: technical/index.md
+  - Changelog: CHANGELOG.md

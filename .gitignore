@@ -1,0 +1,8 @@
+.env
+.env.*
+site/
+node_modules/
+target/
+.venv/
+dist/
+.claude/settings.local.json
