@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:pdf": "node scripts/build-pdf-stub.mjs",
     "preview": "astro preview --ignore-lock",
     "check": "astro check"
   },
