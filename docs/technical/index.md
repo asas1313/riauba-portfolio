@@ -257,10 +257,17 @@ entry's raw body, Astro has already rendered it to cached HTML — see
   stripped) output is unchanged. So `createSatteriTodoParagraphPlugin`'s own `warn` is wired as a
   no-op in production, and the same integration also hooks `astro:build:start` — which Astro
   calls unconditionally, once per `astro build`, before any content-layer sync happens — to call
-  `warnAboutTodoParagraphsInFiles`, which scans `content/projects/*.md` directly off disk (its own
-  dependency-free, text-level approximation of "top-level TODO paragraph", independent of mdast
-  or the content-layer cache entirely) and warns once per affected file. This fires on every
-  build, cold or warm cache alike; see ADR-0003's Addendum for the investigation.
+  `warnAboutTodoParagraphsInFiles`, which scans `content/projects/*.md` directly off disk and
+  counts top-level TODO paragraphs via `countTopLevelTodoParagraphsInMarkdownBody`. That counter
+  parses each file's body with `satteri`'s own `markdownToMdast` (the same native mdast parser
+  Astro's `satteri()` processor uses) and runs the result through `createSatteriTodoParagraphPlugin`
+  itself — the literal same plugin that performs the real stripping — reading back its count via
+  an `onRemoved` callback. There is exactly one piece of logic deciding "is this a top-level TODO
+  paragraph"; the warning and the actual stripped output cannot disagree. (An earlier version of
+  this counter was a bespoke, dependency-free text-level block splitter, independent of mdast —
+  it disagreed with the real plugin on a loose-list lazy continuation and a setext heading, a bug
+  found in review 2 and fixed by this mdast-based rewrite.) This fires on every build, cold or
+  warm cache alike; see ADR-0003's Addendum for the investigation.
 
 ### `src/content.config.ts`
 
@@ -325,10 +332,13 @@ export default defineConfig({
 - `integrations: [todoParagraphStrippingIntegration()]` — a small inline integration (spec 003,
   not a separate npm package) whose `astro:config:setup` hook sets `markdown.processor:
   satteri({ mdastPlugins: [createSatteriTodoParagraphPlugin({ enabled: command === "build",
-  warn: console.warn }) ] })`, gating AC-5's TODO-paragraph stripping on the real CLI command.
-  This is an inline integration, rather than the plain object/functional forms `defineConfig`
-  might suggest, because Astro's `defineConfig` never invokes a function passed as its default
-  export — `astro:config:setup` is the documented way to read `command` — see
+  warn: () => {} }) ] })`, gating AC-5's TODO-paragraph stripping on the real CLI command. The
+  Sätteri plugin's own `warn` is a no-op in production — the `astro:build:start` hook (see
+  [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) below) is the
+  sole source of the AC-5 build warning. This is an inline integration, rather than the plain
+  object/functional forms `defineConfig` might suggest, because Astro's `defineConfig` never
+  invokes a function passed as its default export — `astro:config:setup` is the documented way
+  to read `command` — see
   [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) and
   [ADR-0003](../adr/0003-project-body-todo-stripping.md)'s Addendum.
 
