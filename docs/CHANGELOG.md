@@ -17,17 +17,12 @@
   production builds, with a build warning naming the file and count — the same `TODO` marker
   and whole-word/case-sensitive rule as spec 002's CV field stripping, implemented separately
   for markdown ASTs (`src/lib/markdown-todo.ts`) since the two operate on different data shapes
-  at different times. See ADR-0003 for the full design, including two deviations discovered
-  while implementing it: Astro 7.4 ships Sätteri, not the classic remark/unified pipeline, as
-  its default Markdown processor (so the plugin targets Sätteri's native API instead of
-  `markdown.remarkPlugins`), and Astro's `defineConfig` doesn't support a functional/callback
-  form (so the production/dev gating is wired through a small inline integration instead). The
-  warning itself is emitted from a separate, cache-independent scan of `content/projects/*.md`
-  on an `astro:build:start` hook, not from the Sätteri plugin's `before` hook — review found
-  that Astro's content-layer cache skips re-rendering (and therefore skips re-invoking the
-  plugin) for a file whose on-disk content is unchanged since the last sync, so the warning
-  would otherwise silently stop firing on the second and later consecutive builds against a
-  warm cache. The `astro:build:start` hook always runs, so the warning now fires every build.
+  at different times. The stripping itself runs as a plugin on Astro's native Sätteri Markdown
+  processor (`createSatteriTodoParagraphPlugin`), wired up via a small inline Astro integration;
+  the build warning is emitted independently, from an `astro:build:start` scan of
+  `content/projects/*.md` on disk that reuses the same paragraph-matching logic, so it fires
+  reliably on every build regardless of Astro's content-layer cache state. See ADR-0003 for the
+  full design and its rationale.
 - `/how-this-site-was-built` page explaining the spec → plan → implement → test → review →
   docs delivery pipeline and its two human approval gates (plan approval, PR review before
   merge), with a table listing every spec in `docs/specs/` (number, title, status, and a link
