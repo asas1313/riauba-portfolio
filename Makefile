@@ -45,4 +45,4 @@ deploy:
 
 smoke:
 	@url=$$( [ "$(ENV)" = "production" ] && echo https://riauba.org || echo https://staging.riauba.org ); \
-	curl -fsS $$url/ >/dev/null && curl -fsS $$url/andrius-r-cv.pdf >/dev/null && echo "smoke OK: $$url"
+	curl -fsS $$url/ >/dev/null && curl -fsS $$url/andrius-riauba-cv.pdf >/dev/null && echo "smoke OK: $$url"

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "build:pdf": "node scripts/build-pdf-stub.mjs",
+    "build:pdf": "node scripts/build-pdf.mjs",
     "preview": "astro preview --ignore-lock",
     "check": "astro check",
     "capture-screenshots": "playwright test --config=playwright.screenshots.config.ts"
@@ -23,6 +23,8 @@
     "eslint": "^10.14.0",
     "eslint-plugin-astro": "^3.2.1",
     "globals": "^17.14.0",
+    "pdf-parse": "^2.4.5",
+    "playwright-core": "1.65.0",
     "prettier": "^3.9.10",
     "prettier-plugin-astro": "^1.1.2",
     "typescript": "^6.0.3",
