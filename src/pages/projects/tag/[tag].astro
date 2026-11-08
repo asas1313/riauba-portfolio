@@ -27,7 +27,7 @@ const { tag } = Astro.params;
   path={`/projects/tag/${tag}`}
 >
   <h1>Projects tagged "{label}"</h1>
-  <ul>
+  <ul class="project-list">
     {projects.map((project) => (
       <ProjectCard project={project} />
     ))}

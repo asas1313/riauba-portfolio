@@ -14,7 +14,7 @@ const projects = getAllProjectsSorted(allProjects);
   path="/projects"
 >
   <h1>Projects</h1>
-  <ul>
+  <ul class="project-list">
     {projects.map((project) => (
       <ProjectCard project={project} />
     ))}

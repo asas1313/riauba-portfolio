@@ -9,7 +9,7 @@ interface Props {
 const { project } = Astro.props;
 ---
 
-<li>
+<li class="project-card">
   <a data-testid="project-link" href={`/projects/${project.id}`}>
     {project.data.title}
   </a>

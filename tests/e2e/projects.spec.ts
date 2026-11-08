@@ -34,6 +34,36 @@ test.describe("/projects catalogue page (AC-1)", () => {
   });
 });
 
+test.describe("project cards render as actual cards, not a bulleted list (spec 005, task 8)", () => {
+  for (const path of ["/", "/projects"]) {
+    test(`${path}: each project entry has a card surface (background, border, radius) and no list marker`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      const cards = page.locator(".project-card");
+      expect(await cards.count()).toBeGreaterThan(0);
+      const count = await cards.count();
+      for (let i = 0; i < count; i++) {
+        const card = cards.nth(i);
+        const styles = await card.evaluate((el) => {
+          const computed = getComputedStyle(el);
+          return {
+            listStyleType: computed.listStyleType,
+            backgroundColor: computed.backgroundColor,
+            borderWidth: computed.borderTopWidth,
+            borderRadius: computed.borderTopLeftRadius,
+          };
+        });
+        expect(styles.listStyleType).toBe("none");
+        expect(styles.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+        expect(styles.backgroundColor).not.toBe("transparent");
+        expect(styles.borderWidth).not.toBe("0px");
+        expect(styles.borderRadius).not.toBe("0px");
+      }
+    });
+  }
+});
+
 test.describe("/projects stack tag filtering (AC-3)", () => {
   test("every stack tag on /projects links to /projects/tag/<slug>", async ({
     page,
