@@ -2,12 +2,7 @@ import { z } from "zod";
 import { cv } from "./cv.ts";
 import { cvSchema } from "./cv.schema.ts";
 import type { Cv } from "./cv.schema.ts";
-
-// Matches the placeholder marker as a whole word only, case-sensitively, so
-// "TODO: ask about dates" matches but "Kristodoras" and "todo" do not
-// (spec 002, decision #2 — supersedes spec 001's case-insensitive
-// substring rule).
-const TODO_PATTERN = /\bTODO\b/;
+import { TODO_PATTERN } from "./todo.ts";
 
 /**
  * Recursively walks a parsed `Cv` tree (or any value shaped like part of
