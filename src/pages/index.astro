@@ -1,13 +1,9 @@
 ---
-// Placeholder home page. Replaced with the real content-driven home page in task 9.
+// Placeholder home-page content. Real content-driven markup lands in task 9;
+// this task only proves BaseLayout/Header/Footer wiring (AC-5).
+import BaseLayout from "../components/BaseLayout.astro";
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>riauba.org</title>
-  </head>
-  <body>
-    <h1>hello world</h1>
-  </body>
-</html>
+<BaseLayout title="riauba.org" description="Placeholder home page." path="/">
+  <h1>hello world</h1>
+</BaseLayout>

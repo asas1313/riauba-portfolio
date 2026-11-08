@@ -1,35 +1,15 @@
-import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cv, getVisibleProfiles, resolveCvPath } from "../../src/lib/cv.ts";
+import { cv, getVisibleProfiles } from "../../src/lib/cv.ts";
 import type { Profile } from "../../src/lib/cv.schema.ts";
 
 describe("cv", () => {
   it("loads and parses content/cv.yaml into basics.name", () => {
     expect(cv.basics.name).toBe("Andrius Riauba");
   });
-});
 
-describe("resolveCvPath", () => {
-  it("resolves content/cv.yaml relative to the project root, not process.cwd()", () => {
-    const resolved = resolveCvPath();
-    expect(existsSync(resolved)).toBe(true);
-    expect(
-      resolved.endsWith("content/cv.yaml") ||
-        resolved.endsWith("content\\cv.yaml"),
-    ).toBe(true);
-  });
-
-  it("stays correct even if the current working directory changes", () => {
-    const before = resolveCvPath();
-    const originalCwd = process.cwd();
-    process.chdir("/tmp");
-    try {
-      const after = resolveCvPath();
-      expect(after).toBe(before);
-      expect(existsSync(after)).toBe(true);
-    } finally {
-      process.chdir(originalCwd);
-    }
+  it("loads the full basics block, not a partial/stale fixture", () => {
+    expect(cv.basics.label).toContain("Senior Java Developer");
+    expect(cv.basics.email).toBe("andrius@riauba.org");
   });
 });
 

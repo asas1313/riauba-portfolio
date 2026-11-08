@@ -1,23 +1,25 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { parseCv } from "./cv.schema.ts";
 import type { Profile } from "./cv.schema.ts";
-
-/**
- * Resolves the absolute path to content/cv.yaml from the project root,
- * using this module's own location (import.meta.url), not
- * process.cwd() — Vitest and `astro build` invoke modules from different
- * working directories, so a cwd-relative path would be fragile. See
- * ADR-0001.
- */
-export function resolveCvPath(): string {
-  return fileURLToPath(new URL("../../content/cv.yaml", import.meta.url));
-}
+// Imported as a raw string via Vite's `?raw` suffix, not read with node:fs
+// at runtime: Vite resolves `?raw` imports against this module's *source*
+// location at transform time and inlines the file's contents as a string
+// literal in the output. This is deliberately not
+// `new URL("../../content/cv.yaml", import.meta.url)` + `readFileSync`:
+// that pattern is Vite's asset-URL convention (rewritten to point at the
+// final location *within dist/*, since it assumes the asset should ship to
+// the browser), which breaks here because `astro build` bundles this module
+// into a temporary `dist/.prerender/chunks/...` location for prerendering —
+// a relative-from-module-location fs path computed from that chunk's
+// position no longer points at the real content/cv.yaml. The `?raw` import
+// has no such problem: it is resolved once, during the build's module graph
+// analysis, against the real source file, independent of both
+// process.cwd() and where the importing module ends up being bundled. See
+// ADR-0001.
+import rawCvYaml from "../../content/cv.yaml?raw";
 
 function loadCv() {
-  const raw = readFileSync(resolveCvPath(), "utf-8");
-  const data = parseYaml(raw);
+  const data = parseYaml(rawCvYaml);
   return parseCv(data);
 }
 
