@@ -6,7 +6,7 @@ const linkedIn = cv.basics.profiles.find(
   (profile) => profile.network === "LinkedIn",
 );
 
-const pages = ["/"];
+const pages = ["/", "/404"];
 
 for (const path of pages) {
   test.describe(`shared layout on ${path}`, () => {
