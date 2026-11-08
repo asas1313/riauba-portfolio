@@ -27,12 +27,23 @@ function loadCv() {
 export const cv = loadCv();
 
 /**
- * Hides any profile entry whose network or url is the literal placeholder
- * string "TODO" (AC-2). The fuller "omit any TODO field + build warning"
- * mechanism is spec 002's job.
+ * Returns true when `value` is the placeholder string "TODO", ignoring
+ * surrounding whitespace and casing (so content typos like "todo" or
+ * " TODO" are still treated as placeholders rather than being silently
+ * published).
+ */
+function isTodoPlaceholder(value: string): boolean {
+  return value.trim().toUpperCase() === "TODO";
+}
+
+/**
+ * Hides any profile entry whose network or url is the placeholder string
+ * "TODO" (AC-2), matched case- and whitespace-insensitively. The fuller
+ * "omit any TODO field + build warning" mechanism is spec 002's job.
  */
 export function getVisibleProfiles(profiles: Profile[]): Profile[] {
   return profiles.filter(
-    (profile) => profile.network !== "TODO" && profile.url !== "TODO",
+    (profile) =>
+      !isTodoPlaceholder(profile.network) && !isTodoPlaceholder(profile.url),
   );
 }

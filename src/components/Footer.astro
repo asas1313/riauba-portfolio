@@ -3,7 +3,7 @@ import { cv, getVisibleProfiles } from "../lib/cv.ts";
 
 const year = new Date().getFullYear();
 const linkedIn = getVisibleProfiles(cv.basics.profiles).find(
-  (profile) => profile.network === "LinkedIn",
+  (profile) => profile.network.trim().toLowerCase() === "linkedin",
 );
 ---
 
