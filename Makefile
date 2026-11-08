@@ -7,7 +7,7 @@ setup:
 test:
 	npx vitest run --passWithNoTests
 
-e2e:
+e2e: build
 	npx playwright test
 
 lint:
