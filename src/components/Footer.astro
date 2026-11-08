@@ -1,15 +1,15 @@
 ---
-import { cv, getVisibleProfiles } from "../lib/cv.ts";
+import { cvForBuild } from "../lib/cv.publish.ts";
 
 const year = new Date().getFullYear();
-const linkedIn = getVisibleProfiles(cv.basics.profiles).find(
+const linkedIn = cvForBuild.basics.profiles.find(
   (profile) => profile.network.trim().toLowerCase() === "linkedin",
 );
 ---
 
 <footer class="site-footer">
   <p>
-    <a href={`mailto:${cv.basics.email}`}>{cv.basics.email}</a>
+    <a href={`mailto:${cvForBuild.basics.email}`}>{cvForBuild.basics.email}</a>
     {linkedIn && (
       <>
         {" "}
@@ -18,6 +18,6 @@ const linkedIn = getVisibleProfiles(cv.basics.profiles).find(
     )}
   </p>
   <p>
-    © {year} {cv.basics.name}
+    © {year} {cvForBuild.basics.name}
   </p>
 </footer>
