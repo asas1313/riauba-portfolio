@@ -1,0 +1,35 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../../components/BaseLayout.astro";
+import ProjectCard from "../../../components/ProjectCard.astro";
+import { getAllTagSlugs } from "../../../lib/projects.ts";
+
+export async function getStaticPaths() {
+  const allProjects = await getCollection("projects");
+  return getAllTagSlugs(allProjects).map(({ slug, label, projects }) => ({
+    params: { tag: slug },
+    props: { label, projects },
+  }));
+}
+
+interface Props {
+  label: string;
+  projects: Awaited<ReturnType<typeof getCollection<"projects">>>;
+}
+
+const { label, projects } = Astro.props;
+const { tag } = Astro.params;
+---
+
+<BaseLayout
+  title={`Projects tagged "${label}" — Andrius Riauba`}
+  description={`Every project tagged "${label}".`}
+  path={`/projects/tag/${tag}`}
+>
+  <h1>Projects tagged "{label}"</h1>
+  <ul>
+    {projects.map((project) => (
+      <ProjectCard project={project} />
+    ))}
+  </ul>
+</BaseLayout>

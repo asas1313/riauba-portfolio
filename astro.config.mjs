@@ -3,37 +3,52 @@ import { defineConfig } from "astro/config";
 import { satteri } from "@astrojs/markdown-satteri";
 import { createSatteriTodoParagraphPlugin } from "./src/lib/markdown-todo.ts";
 
-// Static site for riauba.org. No UI framework integrations: every page is a
-// plain .astro component with zero client-side JavaScript by default.
-//
-// Functional `defineConfig(({ command }) => ({ ... }))` form (rather than a
-// plain object) so markdown.processor can gate TODO-paragraph stripping
-// (spec 003, AC-5) on `command === "build"` — mirroring cv.publish.ts's
-// `import.meta.env.PROD` check, using the config-time equivalent since
-// `import.meta.env` isn't meaningful inside astro.config.mjs itself. See
-// ADR-0003 and src/lib/markdown-todo.ts for why this goes through Sätteri's
-// native plugin API (`markdown.processor: satteri({ mdastPlugins: [...] })`)
-// rather than the classic `markdown.remarkPlugins` the ADR originally
-// specified: Astro 7.4 (pinned by this repo) ships Sätteri, not the
-// unified/remark pipeline, as its default Markdown processor, and
-// `remarkPlugins` throws a config-validation error unless
-// `@astrojs/markdown-remark` is installed separately (empirically verified
-// — see ADR-0003's Addendum). `@astrojs/markdown-satteri` is Astro's own
-// bundled default Markdown engine (already a mandatory part of installing
-// `astro` itself, not a new third-party dependency); it is listed explicitly
-// in package.json only because this config needs to import it directly,
-// per Astro's own documented `markdown.processor` configuration pattern.
-export default defineConfig(({ command }) => ({
+// Deviation from ADR-0003's "functional `defineConfig(({ command }) => ({
+// ... }))`" wording: Astro's own `defineConfig` (node_modules/astro/dist/
+// config/index.js) is a plain identity function — `defineConfig(config) {
+// return config; }` — unlike Vite's `defineConfig`, it does not support a
+// functional/callback config shape at all (empirically confirmed: a
+// function passed as the default export is never invoked). The documented,
+// supported way to read the current command (`dev`/`build`/`preview`/
+// `sync`) and mutate config in response is an integration's
+// `astro:config:setup` hook, which is given both `command` and
+// `updateConfig` — so TODO-paragraph stripping (spec 003, AC-5) is wired up
+// by a small inline integration instead. See ADR-0003's Addendum and
+// src/lib/markdown-todo.ts for why this targets Sätteri's native plugin API
+// (`markdown.processor: satteri({ mdastPlugins: [...] })`) rather than the
+// classic `markdown.remarkPlugins` the ADR originally specified.
+function todoParagraphStrippingIntegration() {
+  return {
+    name: "todo-paragraph-stripping",
+    hooks: {
+      "astro:config:setup": ({ command, updateConfig }) => {
+        updateConfig({
+          markdown: {
+            processor: satteri({
+              mdastPlugins: [
+                createSatteriTodoParagraphPlugin({
+                  // TODOs render as-is in `astro dev`; are stripped in
+                  // `astro build` — mirroring cv.publish.ts's
+                  // `import.meta.env.PROD` gating, using the config-time
+                  // equivalent since `import.meta.env` isn't meaningful
+                  // inside astro.config.mjs itself.
+                  enabled: command === "build",
+                  warn: console.warn,
+                }),
+              ],
+            }),
+          },
+        });
+      },
+    },
+  };
+}
+
+// Static site for riauba.org. No UI framework integrations beyond the one
+// above: every page is a plain .astro component with zero client-side
+// JavaScript by default.
+export default defineConfig({
   site: "https://riauba.org",
   output: "static",
-  markdown: {
-    processor: satteri({
-      mdastPlugins: [
-        createSatteriTodoParagraphPlugin({
-          enabled: command === "build",
-          warn: console.warn,
-        }),
-      ],
-    }),
-  },
-}));
+  integrations: [todoParagraphStrippingIntegration()],
+});

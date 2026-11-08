@@ -158,3 +158,41 @@ caching — that reasoning is unaffected by which Markdown processor renders the
 when an ADR's Decision depends on a specific third-party library's configuration surface, verify
 it against the project's actually-pinned version of that library, not just its documented API
 shape in general.
+
+A second, independent gap surfaced the same way: this ADR's original Decision also assumed
+`astro.config.mjs` could use a *functional* `defineConfig(({ command }) => ({ ... }))` form
+(mirroring Vite's `defineConfig`) to read the current CLI command. Astro's own `defineConfig`
+(`node_modules/astro/dist/config/index.js`) is a plain identity function —
+`defineConfig(config) { return config; }` — and does **not** support a callback form at all;
+passing a function as the config's default export means that function is simply never called
+(empirically confirmed by adding a `console.error` inside it and observing it never print, in
+multiple fresh-cache builds). The documented, supported way to read `command` and mutate config in
+response is an integration's `astro:config:setup` hook, which receives both `command` and
+`updateConfig`. `astro.config.mjs` therefore defines a small inline integration (no new package)
+that calls `updateConfig({ markdown: { processor: satteri({ mdastPlugins: [...] }) } })` from
+inside that hook, gating `enabled: command === "build"` there instead.
+
+**Amendment-8 verification (performed empirically, not assumed):** with the fix above in place,
+three scenarios were exercised end-to-end against the real `content/projects/atsidek.md` and
+`payments-migration.md` (both of which have a real `TODO (Andrius): ...` top-level paragraph):
+
+1. A completely fresh content-layer cache (both `.astro/` and `node_modules/.astro/` removed),
+   `astro build` run directly: the build log shows `markdown-todo: omitted 1 TODO-marked
+   paragraph(s) from .../atsidek.md` (and the same for `payments-migration.md`), and the built
+   `dist/projects/atsidek/index.html` / `dist/projects/payments-migration/index.html` contain no
+   `TODO` text anywhere.
+2. From that same fresh cache, `astro dev` started, fetched via `fetch("http://localhost:.../
+   projects/atsidek/")` (confirms a real HTTP response, not just a static file check), stopped
+   (`astro dev stop`) — the dev response **does** contain the literal `TODO` paragraph, confirming
+   `enabled: command === "build"` correctly leaves TODOs visible in dev.
+3. The specific risk amendment 8 names: starting from a *fresh* cache again, running `astro dev`
+   first (confirmed via `fetch` to serve the un-stripped TODO paragraph), stopping it, then running
+   `astro build` immediately afterwards **without** clearing `.astro/` or `node_modules/.astro/` in
+   between. Result: the build log still shows both `markdown-todo: omitted ...` warnings, and the
+   built HTML still has no `TODO` text — the dev warm-up's cache entries did not leak un-stripped
+   HTML into the subsequent production build. No cache-busting fix was needed; the risk named in
+   amendment 8 did not materialize in practice for this codebase's actual usage pattern (every
+   markdown file is fully re-rendered through the still-synchronous `getRenderFunction`/`render`
+   call path on each `astro build`/`astro dev` invocation observed here, rather than silently
+   reusing a cross-command persisted `rendered.html`). If a future Astro version changes this
+   caching behaviour, re-run this same three-scenario check before assuming it still holds.
