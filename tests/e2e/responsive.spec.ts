@@ -5,7 +5,17 @@ import { expect, test } from "@playwright/test";
 // own line below the site name via flex-wrap (decision 7) -- no JS, no
 // hidden/revealed state to test.
 const widths = [360, 768, 1280];
-const navLabels = ["Home", "Projects", "CV", "How this site was built"];
+// QA pass (spec 005 verification): the original list only covered 4 of the
+// 5 real nav items, silently skipping "Download CV (PDF)" -- AC-4/decision
+// 7 requires *every* nav <a> to be visible and independently clickable at
+// 360px, not a subset.
+const navLabels = [
+  "Home",
+  "Projects",
+  "CV",
+  "How this site was built",
+  "Download CV (PDF)",
+];
 
 for (const width of widths) {
   test.describe(`responsive layout at ${width}px`, () => {
