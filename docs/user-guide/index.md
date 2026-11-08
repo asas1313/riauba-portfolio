@@ -122,11 +122,27 @@ table listing every spec (number, title, status, and a link to its merged pull r
 one exists). There's nothing to author here yourself — it's generated from `docs/specs/` at
 build time, not from `content/`.
 
+![How this site was built page](img/how-this-site-was-built-light.png)
+
 ## How to add a new project
 
 Featured projects (`featured: true`) appear on the home page. Every project, featured or not,
 appears on the `/projects` catalogue page (linked from the header as "Projects") and gets its
-own `/projects/<slug>` detail page. To add a new project:
+own `/projects/<slug>` detail page.
+
+![Projects catalogue page, light mode](img/projects-light.png)
+
+![Projects catalogue page, dark mode](img/projects-dark.png)
+
+Each project links through to its own detail page:
+
+![Project detail page](img/project-detail-light.png)
+
+Every `stack` entry is also a tag linking to a page listing every project sharing that tag:
+
+![Project tag filter page](img/project-tag-light.png)
+
+To add a new project:
 
 1. Create a new file in `content/projects/`, named after the project using lowercase letters
    and hyphens, e.g. `content/projects/my-new-project.md`. This filename becomes the project's
