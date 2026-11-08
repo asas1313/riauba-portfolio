@@ -1,0 +1,12 @@
+dist/
+.astro/
+node_modules/
+test-results/
+playwright-report/
+package-lock.json
+content/
+docs/
+.claude/
+.github/
+CLAUDE.md
+mkdocs.yml
