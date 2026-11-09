@@ -1,4 +1,10 @@
-.PHONY: setup test e2e screenshots lint lint-changed format format-file security docs build deploy smoke visual visual-update
+.PHONY: setup test e2e screenshots lint lint-changed format format-file security docs build smoke visual visual-update
+
+# Spec 004, AC-9: `mkdocs build`'s output directory. Defaults to `site`
+# (today's behaviour, unchanged for plain `make docs`/CI); the deploy
+# workflows override it to `dist/docs` so the MkDocs site ships inside the
+# same build artifact as the rest of the site, under /docs/.
+SITE_DIR ?= site
 
 # Playwright Docker image pinned to the exact @playwright/test version in
 # package-lock.json (tests/unit/playwright-docker-version.test.ts enforces
@@ -63,7 +69,7 @@ security:
 
 docs:
 	@pip install -q mkdocs-material >/dev/null 2>&1 || true
-	mkdocs build --strict
+	mkdocs build --strict --site-dir $(SITE_DIR)
 
 # Spec 004, AC-1/task 1: default SITE_URL to https://riauba.org only when
 # truly unset (`${SITE_URL-default}`, deliberately no colon) so an existing
@@ -74,10 +80,36 @@ build:
 	SITE_URL=$${SITE_URL-https://riauba.org} npm run build
 	npm run build:pdf
 
-deploy:
-	@test -n "$(ENV)" || (echo "ENV is required" && exit 1)
-	rsync -az --delete dist/ $$DEPLOY_USER@$$DEPLOY_HOST:$$DEPLOY_PATH/
-
+# Spec 004, AC-8/task 10. The old rsync/SSH `deploy` target is gone for
+# good -- deploy only ever happens from infra/deploy.sh on the homelab
+# runner itself (invoked directly by the deploy workflows), so there is no
+# meaningful "local" `make deploy` against a homelab LXC any more.
+#
+# `make smoke ENV=<staging|production> [SHA=<sha>]`: resolves the public
+# URL from STAGING_URL/PROD_URL (falling back to the temporary
+# *.riaubyne.eu hostnames so this works before any GitHub Environment
+# variable naming is finalised -- see the runbook's "Switch to riauba.org"
+# checklist for when that changes), checks `/`, `/cv`, `/projects`, the
+# real CV PDF filename and `/docs/` all return 200, optionally compares
+# `/version.txt` to SHA when given, and for ENV=staging additionally
+# requires the X-Robots-Tag noindex header on every response.
 smoke:
-	@url=$$( [ "$(ENV)" = "production" ] && echo https://riauba.org || echo https://staging.riauba.org ); \
-	curl -fsS $$url/ >/dev/null && curl -fsS $$url/andrius-riauba-cv.pdf >/dev/null && echo "smoke OK: $$url"
+	@test -n "$(ENV)" || (echo "ENV is required" && exit 1)
+	@url=$$( [ "$(ENV)" = "production" ] \
+		&& echo "$${PROD_URL-https://portfolio.riaubyne.eu}" \
+		|| echo "$${STAGING_URL-https://portfolio-staging.riaubyne.eu}" ); \
+	for path in / /cv /projects /andrius-riauba-cv.pdf /docs/; do \
+		curl -fsS "$$url$$path" >/dev/null || { echo "smoke FAILED: $$url$$path"; exit 1; }; \
+	done; \
+	if [ -n "$(SHA)" ]; then \
+		deployed_sha=$$(curl -fsS "$$url/version.txt"); \
+		[ "$$deployed_sha" = "$(SHA)" ] || { echo "smoke FAILED: version.txt='$$deployed_sha' expected '$(SHA)'"; exit 1; }; \
+	fi; \
+	if [ "$(ENV)" = "staging" ]; then \
+		header=$$(curl -fsSI "$$url/" | tr -d '\r' | grep -i '^x-robots-tag:'); \
+		case "$$header" in \
+			*"noindex, nofollow"*) ;; \
+			*) echo "smoke FAILED: missing X-Robots-Tag: noindex, nofollow on staging"; exit 1 ;; \
+		esac; \
+	fi; \
+	echo "smoke OK: $$url"
