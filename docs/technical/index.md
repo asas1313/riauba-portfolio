@@ -458,10 +458,12 @@ Two environment variables drive the Astro build itself (spec 004):
   so the header and `/robots.txt` can never disagree within one release. Unset locally (`make
   build`/`make e2e` never set it, so both default to indexable); the deploy workflows set it to
   `"true"` for staging always, and for production from the `PROD_NOINDEX` Environment variable
-  (default `"true"` until the runbook's "Switch to riauba.org" checklist flips it to `"false"`).
+  (`"false"` now that the runbook's "Switch to riauba.org" checklist is complete — production is
+  indexable; falls back to `"true"` if the variable is ever unset).
 
 `make smoke ENV=<staging|production> [SHA=<sha>]` (see [Runbook](#runbook) below) reads
-`STAGING_URL`/`PROD_URL` (falling back to the temporary `*.riaubyne.eu` hostnames) and, when
+`STAGING_URL`/`PROD_URL` (falling back to `https://riauba.org`/`https://staging.riauba.org` —
+the temporary `*.riaubyne.eu` hostnames from spec 004's initial rollout are retired) and, when
 given, compares the deployed `/version.txt` against `SHA` — it is a verification command, not a
 build-time one, and consumes no variables that affect the Astro build itself.
 

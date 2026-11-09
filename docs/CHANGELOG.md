@@ -6,19 +6,17 @@
 
 - Real hosting: both staging and production now run on Andrius' Proxmox homelab, served by Caddy
   behind the existing Cloudflare Tunnel (`vepryne-pve`), with TLS terminating at Cloudflare and no
-  inbound port open on the portfolio LXC at all. Temporary `portfolio.riaubyne.eu`/
-  `portfolio-staging.riaubyne.eu` hostnames are used until `riauba.org` DNS is live; switching to
-  the real domain is documented as a configuration-only change — see
+  inbound port open on the portfolio LXC at all. Serves `riauba.org`/`staging.riauba.org` —
+  switching from the temporary `portfolio.riaubyne.eu`/`portfolio-staging.riaubyne.eu` hostnames
+  used during spec 004's initial rollout (the "Switch to riauba.org" checklist, now complete) was
+  a configuration-only change, as documented — see
   [ADR-0005](adr/0005-homelab-self-hosted-runner-deployment.md) and the new
   [deployment runbook](technical/runbook.md).
 - Follow-up fix: `infra/setup-lxc.sh` now resolves `PROD_HOSTS`/`STAGING_HOSTS` from two
   checked-in files, `infra/production.env`/`infra/staging.env`, validating and failing loudly
   before any install step if either is missing or incomplete, generating the systemd
   `EnvironmentFile`/drop-in itself, and validating the Caddyfile with `caddy validate` before
-  ever installing or reloading it. These two files already provision the final `riauba.org`/
-  `staging.riauba.org` hostnames directly, ahead of the rest of this entry's `*.riaubyne.eu`
-  default — see the [runbook](technical/runbook.md)'s step 2 warning and "Switch to riauba.org"
-  checklist for what that means for the remaining, still-pending Cloudflare-side cutover.
+  ever installing or reloading it.
 - Deploys run on a self-hosted GitHub Actions runner (`homelab-riauba`, unprivileged `deploy` OS
   user) that only ever connects outbound to GitHub — no SSH keys, no open inbound ports and no
   deploy secrets exist anywhere in this setup. The build itself always happens on a GitHub-hosted
@@ -45,8 +43,8 @@
   `astro.config.mjs`'s `astro:build:done` hook) drive per-environment canonical/Open Graph URLs,
   `/robots.txt` and a `dist/.noindex` sentinel that `infra/Caddyfile` turns into an
   `X-Robots-Tag: noindex, nofollow` header on the currently deployed release — staging always
-  noindexed, production until the "Switch to riauba.org" checklist flips `PROD_NOINDEX` to
-  `false`.
+  noindexed, production indexable now that `PROD_NOINDEX` is `false` (the "Switch to riauba.org"
+  checklist's last remaining step).
 - `infra/Caddyfile` (shared by both environments, installed by the new idempotent
   `infra/setup-lxc.sh`) serves a strict Content-Security-Policy with `sha256` hashes for the two
   inline scripts shipped by spec 005 (never `unsafe-inline`), plus `X-Content-Type-Options`,
