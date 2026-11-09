@@ -17,6 +17,11 @@
   before any install step if either is missing or incomplete, generating the systemd
   `EnvironmentFile`/drop-in itself, and validating the Caddyfile with `caddy validate` before
   ever installing or reloading it.
+- Follow-up fix: `deploy-staging.yml`/`deploy-production.yml`'s `actions/upload-artifact@v4` step
+  now passes `include-hidden-files: true` — without it, the action silently drops dotfiles, which
+  was stripping `astro.config.mjs`'s `dist/.noindex` sentinel before the deploy job ever saw it,
+  so `infra/Caddyfile`'s `@noindex` header never applied and `make smoke ENV=staging` failed its
+  `X-Robots-Tag` check.
 - Deploys run on a self-hosted GitHub Actions runner (`homelab-riauba`, unprivileged `deploy` OS
   user) that only ever connects outbound to GitHub — no SSH keys, no open inbound ports and no
   deploy secrets exist anywhere in this setup. The build itself always happens on a GitHub-hosted

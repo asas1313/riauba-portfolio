@@ -34,6 +34,11 @@ jobs:
         with:
           name: dist
           path: dist/
+          # actions/upload-artifact@v4 drops dotfiles by default, which
+          # would silently strip astro.config.mjs's dist/.noindex sentinel
+          # (infra/Caddyfile's @noindex matcher) before it ever reaches
+          # the deploy job.
+          include-hidden-files: true
 
   deploy:
     needs: build
