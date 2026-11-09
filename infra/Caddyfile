@@ -1,0 +1,92 @@
+# Spec 004, AC-6. Shared Caddyfile for both the staging and production
+# environments on the homelab portfolio LXC (infra/setup-lxc.sh installs
+# this file to /etc/caddy/Caddyfile). TLS terminates at Cloudflare; Caddy
+# only ever speaks plain HTTP on the LAN side of the Cloudflare Tunnel, so
+# Caddy's own automatic HTTPS (which would try to obtain a certificate for
+# a hostname with no direct inbound access) is disabled globally.
+{
+	auto_https off
+}
+
+# PROD_HOSTS/STAGING_HOSTS are comma-separated hostname lists (AC-6's
+# documented format) used directly as each site block's address list --
+# Caddy's site-address syntax already accepts a comma-separated set of
+# hostnames, so riauba.org can be added later by editing only the
+# environment variable, never this file (spec 004's third user story).
+{$PROD_HOSTS} {
+	root * /srv/riauba/production/current
+	encode zstd gzip
+
+	# Spec 004, task 6: sha256 hashes (never `unsafe-inline`) for the two
+	# inline <script is:inline> blocks shipped by BaseLayout.astro and
+	# Header.astro (spec 005). tests/unit/csp-script-hashes.test.ts keeps
+	# these in sync with the actual script source.
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-vFjR39xymxSJhjVaBkX4H99XaM91gfYRyXtMZKBhZBw=' 'sha256-AvAdoWkvXnImQk/K6aXVZisGqK2nSqLEQxrlOK1RpsI='; style-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+	}
+
+	# Build-time sentinel (astro.config.mjs's astro:build:done hook, task 2):
+	# present in the currently deployed release only when that release was
+	# built with NOINDEX=true. Never served as a literal response body
+	# (`hide .noindex` below) -- it only drives this header. The `file`
+	# matcher's path is relative to the site's `root` above, so no
+	# per-environment path needs repeating here.
+	@noindex file .noindex
+	header @noindex X-Robots-Tag "noindex, nofollow"
+
+	@hashedAssets path /_astro/*
+	header @hashedAssets Cache-Control "public, max-age=31536000, immutable"
+
+	@html path *.html
+	header @html Cache-Control "public, max-age=300"
+
+	# The site is 100% static (no backend), so the only error file_server
+	# can realistically produce is 404 (not found) -- `status 404` forces
+	# the real status code on the response even though the matched file
+	# itself (404.html) obviously exists on disk.
+	handle_errors {
+		rewrite * /404.html
+		file_server {
+			status 404
+		}
+	}
+
+	file_server {
+		hide .noindex
+	}
+}
+
+{$STAGING_HOSTS} {
+	root * /srv/riauba/staging/current
+	encode zstd gzip
+
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-vFjR39xymxSJhjVaBkX4H99XaM91gfYRyXtMZKBhZBw=' 'sha256-AvAdoWkvXnImQk/K6aXVZisGqK2nSqLEQxrlOK1RpsI='; style-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+	}
+
+	@noindex file .noindex
+	header @noindex X-Robots-Tag "noindex, nofollow"
+
+	@hashedAssets path /_astro/*
+	header @hashedAssets Cache-Control "public, max-age=31536000, immutable"
+
+	@html path *.html
+	header @html Cache-Control "public, max-age=300"
+
+	handle_errors {
+		rewrite * /404.html
+		file_server {
+			status 404
+		}
+	}
+
+	file_server {
+		hide .noindex
+	}
+}
