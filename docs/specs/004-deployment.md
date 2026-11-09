@@ -76,7 +76,7 @@ GitHub-hosted runner                         Homelab (portfolio LXC, no inbound 
 - **AC-7** Given the staging hostname, then every response carries `X-Robots-Tag: noindex, nofollow` and `robots.txt`
   disallows everything. Production gets the same while `PROD_NOINDEX=true` (default until riauba.org is live).
 - **AC-8** Given `make smoke ENV=<env>`, then it checks over the public URL that `/`, `/cv`, `/projects`,
-  `/andrius-r-cv.pdf` and `/docs/` return 200, that the deployed SHA matches the one just deployed
+  `/andrius-riauba-cv.pdf` and `/docs/` return 200, that the deployed SHA matches the one just deployed
   (exposed at `/version.txt`), and that staging returns the noindex header.
 - **AC-9** Given the production site, then `/docs/` serves the MkDocs build, produced in the same build job.
 - **AC-10** Given `infra/setup-lxc.sh` (run manually by Andrius as root inside a fresh Debian LXC), then it creates the
