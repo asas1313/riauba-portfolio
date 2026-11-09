@@ -2,6 +2,8 @@
 
 Status: Final  ·  Owner: Andrius  ·  Date: 2026-11-09
 
+PR: https://github.com/asas1313/riauba-portfolio/pull/6
+
 ## Goal
 Host both staging and production of the site on Andrius' Proxmox homelab: automatic deploy to staging on
 every merge to main, and a manual, one-click production deploy with instant rollback. The site must work
