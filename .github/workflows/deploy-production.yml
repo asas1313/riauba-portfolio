@@ -1,0 +1,77 @@
+# Spec 004, AC-3: manual, confirm=deploy production deploy. The
+# confirmation gate lives on the *first* job (resolve-ref) so nothing --
+# not even ref resolution -- ever runs on the homelab runner without it
+# (Security hardening). `ref` defaults to the sha currently live on
+# staging (read from /srv/riauba/staging/DEPLOYED on the runner's own
+# filesystem); either way, the resolved sha must be an ancestor of
+# origin/main, so a `ref` input can never deploy an arbitrary/unmerged
+# commit.
+name: deploy-production
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+      ref:
+        description: "Optional: exact commit sha to deploy (default: the sha currently live on staging)"
+        required: false
+jobs:
+  resolve-ref:
+    if: github.event.inputs.confirm == 'deploy' && github.actor == github.repository_owner
+    runs-on: [self-hosted, homelab-riauba]
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.ref }}" ]; then
+            sha="${{ github.event.inputs.ref }}"
+          else
+            sha="$(cut -d' ' -f1 /srv/riauba/staging/DEPLOYED)"
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "resolve-ref: '$sha' is not an ancestor of origin/main -- refusing to deploy" >&2
+            exit 1
+          fi
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
+
+  build:
+    needs: resolve-ref
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve-ref.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: make setup
+      - run: SITE_URL=${{ vars.SITE_URL }} NOINDEX=${{ vars.PROD_NOINDEX || 'true' }} make build
+      - run: make docs SITE_DIR=dist/docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: [resolve-ref, build]
+    # Security hardening: only Andrius' own actions can ever cause this
+    # workflow to execute on the homelab runner.
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, homelab-riauba]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - run: infra/deploy.sh production ${{ needs.resolve-ref.outputs.sha }} dist/
+      - run: make smoke ENV=production

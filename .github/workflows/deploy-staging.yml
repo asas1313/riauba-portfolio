@@ -1,23 +1,42 @@
+# Spec 004, AC-2: every push to main builds with the staging SITE_URL on a
+# GitHub-hosted runner, uploads dist/ as an artifact, then deploys it from
+# the self-hosted homelab-riauba runner via infra/deploy.sh -- no secrets
+# needed, since the runner only ever connects outbound to GitHub.
 name: deploy-staging
 on:
   push:
     branches: [main]
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     environment: staging
     steps:
       - uses: actions/checkout@v4
-      - run: make setup && make build
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
-      - run: make deploy ENV=staging
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      - run: make smoke ENV=staging || echo "TODO: add smoke target"
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: make setup
+      - run: SITE_URL=${{ vars.SITE_URL }} NOINDEX=true make build
+      - run: make docs SITE_DIR=dist/docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: build
+    # Security hardening: only Andrius' own actions can ever cause this
+    # workflow to execute on the homelab runner, regardless of who can
+    # push to main.
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, homelab-riauba]
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - run: infra/deploy.sh staging ${{ github.sha }} dist/
+      - run: make smoke ENV=staging
