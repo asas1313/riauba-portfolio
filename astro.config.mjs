@@ -1,5 +1,5 @@
 // @ts-check
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 import { satteri } from "@astrojs/markdown-satteri";
@@ -7,6 +7,7 @@ import {
   createSatteriTodoParagraphPlugin,
   warnAboutTodoParagraphsInFiles,
 } from "./src/lib/markdown-todo.ts";
+import { resolveSiteUrl } from "./src/lib/site-url.ts";
 
 // Deviation from ADR-0003's "functional `defineConfig(({ command }) => ({
 // ... }))`" wording: Astro's own `defineConfig` (node_modules/astro/dist/
@@ -92,11 +93,62 @@ function todoParagraphStrippingIntegration() {
   };
 }
 
-// Static site for riauba.org. No UI framework integrations beyond the one
+// Spec 004, AC-1/task 1: `site` is no longer a static top-level value —
+// it must be `SITE_URL`, read per the real Astro `command` (`build` requires
+// it; `dev`/`preview`/`check`/`sync` fall back to a local default), which
+// `defineConfig` itself cannot express (see this file's header comment on
+// why a functional default export doesn't work). A second small inline
+// integration, same `astro:config:setup({ command, updateConfig })` shape
+// as `todoParagraphStrippingIntegration` above, calls `updateConfig` once
+// `command` is known.
+function siteUrlIntegration() {
+  return {
+    name: "site-url",
+    hooks: {
+      "astro:config:setup": ({ command, updateConfig }) => {
+        updateConfig({ site: resolveSiteUrl(process.env, command) });
+      },
+    },
+  };
+}
+
+// Spec 004, AC-7/task 2: writes an empty `dist/.noindex` sentinel file
+// whenever the build ran with `NOINDEX=true` (staging: always; production:
+// driven by `PROD_NOINDEX`). The build itself produces only static files —
+// nothing serves them over HTTP at request time — so this sentinel is what
+// lets infra/Caddyfile's `@noindex { file {http.vars.webroot}/.noindex }`
+// matcher add the `X-Robots-Tag: noindex, nofollow` header per the
+// *currently deployed* release, without Caddy needing its own copy of the
+// `NOINDEX` flag. `robots.txt.ts` reads the same `NOINDEX` flag directly,
+// so the file and the header can never disagree within one release.
+function noindexSentinelIntegration() {
+  return {
+    name: "noindex-sentinel",
+    hooks: {
+      "astro:build:done": async ({ dir }) => {
+        if (process.env.NOINDEX === "true") {
+          await writeFile(new URL(".noindex", dir), "");
+        }
+      },
+    },
+  };
+}
+
+// Static site for riauba.org. No UI framework integrations beyond the three
 // above: every page is a plain .astro component with zero client-side
 // JavaScript by default.
 export default defineConfig({
-  site: "https://riauba.org",
   output: "static",
-  integrations: [todoParagraphStrippingIntegration()],
+  // Spec 004, task 6: every stylesheet stays an external, content-hashed
+  // `_astro/*.css` file — Astro never inlines a `<style>` block's CSS into
+  // the HTML, which would otherwise silently need its own `style-src`
+  // hash/`unsafe-inline` allowance in infra/Caddyfile's CSP.
+  build: {
+    inlineStylesheets: "never",
+  },
+  integrations: [
+    todoParagraphStrippingIntegration(),
+    siteUrlIntegration(),
+    noindexSentinelIntegration(),
+  ],
 });

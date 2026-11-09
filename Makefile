@@ -65,8 +65,13 @@ docs:
 	@pip install -q mkdocs-material >/dev/null 2>&1 || true
 	mkdocs build --strict
 
+# Spec 004, AC-1/task 1: default SITE_URL to https://riauba.org only when
+# truly unset (`${SITE_URL-default}`, deliberately no colon) so an existing
+# GitHub Environment variable that is configured but left empty reaches
+# resolveSiteUrl() as an empty string and fails the build loudly, instead of
+# silently substituting the default the way `${SITE_URL:-default}` would.
 build:
-	npm run build
+	SITE_URL=$${SITE_URL-https://riauba.org} npm run build
 	npm run build:pdf
 
 deploy:
