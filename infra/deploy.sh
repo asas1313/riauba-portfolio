@@ -35,6 +35,21 @@
 # previous physical content directory a redeployed sha pointed at is
 # deleted only *after* the symlink has already moved on, so it's always
 # genuinely unreferenced by that point.
+#
+# Review finding (iteration 2): the symlink-indirection scheme above opens
+# a different hole -- a deploy.sh run killed between `cp -a` finishing and
+# the `mv -T` symlink swap (OOM, a cancelled/retried workflow, an LXC
+# reboot mid-deploy; all realistic on this LXC's 1 vCPU/1 GB RAM/8 GB disk
+# budget) leaves the physical `.content/<sha>.<nonce>/` directory it just
+# built fully on disk with no `releases/<sha>` symlink ever pointing at
+# it, and the pruning pass below only ever walks *existing* `releases/`
+# symlinks and their current targets -- it never looks at `.content/`
+# independently, so such an orphan survives forever. Every invocation
+# therefore ends with an orphan-GC sweep: any directory directly under
+# `.content/` whose name is not the `readlink` target of some symlink
+# currently under `releases/` gets deleted, so a previous run's crash gets
+# cleaned up on the very next successful deploy even if nobody notices it
+# in between.
 set -euo pipefail
 
 root="${RIAUBA_ROOT:-/srv/riauba}"
@@ -143,6 +158,28 @@ if [[ -d "$releases_dir" ]]; then
         # points at, then the symlink itself.
         rm -rf "$releases_dir/$(readlink "$entry")"
       fi
+      rm -rf "$entry"
+    fi
+  done
+fi
+
+# Orphan GC: delete every directory under .content/ that is not currently
+# the readlink target of some symlink under releases/ -- see the header
+# comment above for why this can happen and why it must run unconditionally
+# on every invocation, not just after a detected crash.
+declare -A referenced_physical=()
+if [[ -d "$releases_dir" ]]; then
+  for entry in "$releases_dir"/*; do
+    [[ -L "$entry" ]] || continue
+    referenced_physical["$(basename "$(readlink "$entry")")"]=1
+  done
+fi
+
+if [[ -d "$content_dir" ]]; then
+  for entry in "$content_dir"/*; do
+    [[ -d "$entry" ]] || continue
+    name="$(basename "$entry")"
+    if [[ -z "${referenced_physical[$name]:-}" ]]; then
       rm -rf "$entry"
     fi
   done

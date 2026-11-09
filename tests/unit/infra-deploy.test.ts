@@ -277,6 +277,42 @@ describe("infra/deploy.sh (AC-4)", () => {
     expect(readFileSync(join(releaseDir, "file-0.txt"), "utf-8")).toBe("v2-0");
   });
 
+  it("sweeps orphaned .content/ directories left by a crashed deploy, without touching referenced ones", () => {
+    // Regression test (review iteration 2 finding): releases/<sha> is a
+    // symlink into .content/<sha>.<nonce>/, switched into place with a
+    // single atomic `mv -T`. A deploy.sh run killed between finishing the
+    // `cp -a` into .content/ and performing that swap (OOM, a
+    // cancelled/retried workflow, an LXC reboot -- all realistic on this
+    // LXC's constrained resources) leaves the physical directory behind
+    // with no releases/ symlink ever pointing at it, and nothing used to
+    // ever revisit .content/ to notice. deploy.sh must sweep .content/ on
+    // every invocation and delete any directory whose name isn't
+    // currently the `readlink` target of some releases/ symlink, while
+    // leaving legitimately-referenced content alone.
+    runDeploy("staging", "shaKeep", makeDistDir("v1"));
+
+    const contentDir = join(root, "staging", ".content");
+    const orphanDir = join(contentDir, "orphan.99999");
+    mkdirSync(orphanDir, { recursive: true });
+    writeFileSync(join(orphanDir, "index.html"), "orphaned");
+
+    runDeploy("staging", "shaNew", makeDistDir("v2"));
+
+    expect(existsSync(orphanDir)).toBe(false);
+    expect(
+      readFileSync(
+        join(root, "staging", "releases", "shaKeep", "index.html"),
+        "utf-8",
+      ),
+    ).toBe("v1");
+    expect(
+      readFileSync(
+        join(root, "staging", "releases", "shaNew", "index.html"),
+        "utf-8",
+      ),
+    ).toBe("v2");
+  });
+
   it("creates a fresh releases dir structure per environment", () => {
     mkdirSync(root, { recursive: true });
     const dist = makeDistDir("v1");
