@@ -188,7 +188,18 @@ for env_name in staging production; do
 done
 chown -R deploy:deploy /srv/riauba
 
-# 3. Caddy, from its official apt repository (idempotent: skipped if
+# 3. `make` -- the deploy-staging.yml/deploy-production.yml workflows run
+#    `make smoke` on this runner after infra/deploy.sh, and the bare LXC
+#    image doesn't ship it.
+if command -v make >/dev/null 2>&1; then
+  echo "setup-lxc.sh: make already installed, skipping"
+else
+  apt-get update
+  apt-get install -y make
+  echo "setup-lxc.sh: installed make"
+fi
+
+# 4. Caddy, from its official apt repository (idempotent: skipped if
 #    already installed).
 if command -v caddy >/dev/null 2>&1; then
   echo "setup-lxc.sh: caddy already installed ($(caddy version)), skipping install"
@@ -204,6 +215,9 @@ else
   echo "setup-lxc.sh: installed caddy ($(caddy version))"
 fi
 
+# 5. Install infra/Caddyfile and reload (always re-applied, even when
+#    Caddy was already installed, so a Caddyfile edit takes effect on a
+#    re-run).
 # 4. Compute what the resolved variables want written to the systemd
 #    EnvironmentFile and the drop-in, and whether that would change
 #    what's currently on disk -- READ-ONLY at this point, nothing is
@@ -285,6 +299,7 @@ echo "setup-lxc.sh: validated and installed /etc/caddy/Caddyfile, wrote $caddy_e
 
 systemctl enable caddy >/dev/null 2>&1 || true
 
+# 6. Print the exact runner-registration commands. These are never run
 # 7. Reload vs. restart: a changed EnvironmentFile/drop-in only takes
 #    effect on process start, never via `caddy reload`'s live hot-swap --
 #    so this must daemon-reload + restart whenever either changed this
