@@ -101,6 +101,10 @@ build:
 # requires the X-Robots-Tag noindex header on every response.
 smoke:
 	@test -n "$(ENV)" || (echo "ENV is required" && exit 1)
+	@case "$(ENV)" in \
+		staging | production) ;; \
+		*) echo "smoke FAILED: ENV must be 'staging' or 'production', got '$(ENV)'"; exit 2 ;; \
+	esac
 	@url=$$( [ "$(ENV)" = "production" ] \
 		&& echo "$${PROD_URL-https://portfolio.riaubyne.eu}" \
 		|| echo "$${STAGING_URL-https://portfolio-staging.riaubyne.eu}" ); \
