@@ -116,6 +116,27 @@ describe("infra/rollback.sh (AC-5)", () => {
     expect(currentTarget("staging")).toBe("releases/shaB");
   });
 
+  it("after an explicit-sha rollback, a following no-sha rollback undoes that jump (goes to what was live right before it), not the deploy-chronology walk-back", () => {
+    // Regression test (QA finding, round 2): deploy A, B, C, D; an
+    // *explicit* rollback to B is a deliberate jump, distinct from an
+    // *automatic* (no-sha) walk-back. Undoing it with a no-sha rollback
+    // must return to D -- the release actually live immediately before
+    // the explicit jump -- never fall into the deploy-chronology
+    // walk-back logic (which is reserved for undoing a *previous no-sha*
+    // rollback) and land on A instead.
+    deploy("staging", "shaA");
+    deploy("staging", "shaB");
+    deploy("staging", "shaC");
+    deploy("staging", "shaD");
+    expect(currentTarget("staging")).toBe("releases/shaD");
+
+    runRollback("staging", "shaB"); // deliberate explicit jump
+    expect(currentTarget("staging")).toBe("releases/shaB");
+
+    runRollback("staging"); // undo the jump -> must land on shaD
+    expect(currentTarget("staging")).toBe("releases/shaD");
+  });
+
   it("with an explicit sha, repoints to that exact release", () => {
     deploy("production", "shaA");
     deploy("production", "shaB");
@@ -146,7 +167,7 @@ describe("infra/rollback.sh (AC-5)", () => {
     expect(deployed).toMatch(/^shaA\s+\S+/);
   });
 
-  it("appends a rollback line to releases.log, distinct from deploy lines", () => {
+  it("appends a rollback-explicit line to releases.log for an explicit-sha rollback, distinct from deploy lines", () => {
     deploy("staging", "shaA");
     deploy("staging", "shaB");
     runRollback("staging", "shaA");
@@ -154,6 +175,17 @@ describe("infra/rollback.sh (AC-5)", () => {
     const log = readFileSync(join(root, "staging", "releases.log"), "utf-8");
     const lines = log.trim().split("\n");
     expect(lines).toHaveLength(3);
-    expect(lines[2]).toMatch(/^shaA\s+\S+\s+rollback$/);
+    expect(lines[2]).toMatch(/^shaA\s+\S+\s+rollback-explicit$/);
+  });
+
+  it("appends a rollback-auto line to releases.log for a no-sha rollback, distinct from deploy and rollback-explicit lines", () => {
+    deploy("staging", "shaA");
+    deploy("staging", "shaB");
+    runRollback("staging");
+
+    const log = readFileSync(join(root, "staging", "releases.log"), "utf-8");
+    const lines = log.trim().split("\n");
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toMatch(/^shaA\s+\S+\s+rollback-auto$/);
   });
 });
