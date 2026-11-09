@@ -1,6 +1,6 @@
 # ADR-0005: Homelab deployment via a self-hosted GitHub Actions runner, immutable SHA releases
 
-Status: Proposed · Date: 2026-11-09
+Status: Accepted · Date: 2026-11-09
 
 ## Context
 

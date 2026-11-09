@@ -232,19 +232,17 @@ Claude/CI must never change repository settings on Andrius' behalf.
 every path (`* @asas1313`), so the branch ruleset's "require review from a code owner" rule
 always has someone to request review from.
 
-### `riauba-bot`: the runner's OS-level service account
+### The `deploy` OS user: not a GitHub identity, and it never reviews anything
 
-**`riauba-bot` is not a GitHub identity, and it never reviews anything.** The human reviewer for
-both the branch ruleset's code-owner requirement and the `production` environment's required
-reviewer is `@asas1313` (Andrius' own GitHub account, named in `.github/CODEOWNERS` and in the
-Environment protection setting above) — that's deliberate: approving a production deploy or a
-pull request is a decision only Andrius himself makes, never automation.
+The human reviewer for both the branch ruleset's code-owner requirement and the `production`
+environment's required reviewer is `@asas1313` (Andrius' own GitHub account, named in
+`.github/CODEOWNERS` and in the Environment protection setting above) — that's deliberate:
+approving a production deploy or a pull request is a decision only Andrius himself makes, never
+automation.
 
-`riauba-bot` is the name of the **unprivileged Linux system user** that `infra/setup-lxc.sh`
-creates on the portfolio LXC (step 2 above calls this account `deploy` in the actual script and
-systemd service — `riauba-bot` is just a more memorable name for the same account if you choose
-to rename it). It is the OS-level account the GitHub Actions runner process and every
-`infra/deploy.sh`/`infra/rollback.sh` invocation run as — never root, and never tied to any
+`deploy` is the **unprivileged Linux system user** that `infra/setup-lxc.sh` creates on the
+portfolio LXC (step 2 above). It is the OS-level account the GitHub Actions runner process and
+every `infra/deploy.sh`/`infra/rollback.sh` invocation run as — never root, and never tied to any
 GitHub account at all:
 
 - **Why a dedicated OS user:** the runner process and the files it writes
