@@ -52,6 +52,18 @@ jobs:
             sha="$(cut -d' ' -f1 /srv/riauba/staging/DEPLOYED)"
           fi
           git fetch origin main
+          # Review finding: canonicalize to a full 40-char commit hash
+          # before it's used for anything else. Without this, a short
+          # sha, branch name or tag passed via `ref` would satisfy
+          # `merge-base --is-ancestor` fine but then become the literal
+          # release directory name under infra/deploy.sh, breaking the
+          # "immutable, SHA-named release directories" invariant the
+          # pruning/rollback log-walk logic relies on -- and a value
+          # containing "/" (e.g. a branch name) would hard-fail
+          # infra/deploy.sh's `cp -a` outright. `--end-of-options` also
+          # defuses the unrelated, separate case of a ref value starting
+          # with "-" being parsed as a flag by a later git/shell command.
+          sha="$(git rev-parse --verify --end-of-options "$sha")"
           if ! git merge-base --is-ancestor "$sha" origin/main; then
             echo "resolve-ref: '$sha' is not an ancestor of origin/main -- refusing to deploy" >&2
             exit 1
@@ -97,4 +109,11 @@ jobs:
       - env:
           RESOLVED_SHA: ${{ needs.resolve-ref.outputs.sha }}
         run: infra/deploy.sh production "$RESOLVED_SHA" dist/
-      - run: make smoke ENV=production
+      # Review finding: a step-level `env:` block is scoped to that step
+      # only -- it does not carry over to this sibling step, so SHA must
+      # be set again here for AC-8's version-check to actually run
+      # (`make smoke` only compares against /version.txt when SHA is
+      # non-empty).
+      - env:
+          SHA: ${{ needs.resolve-ref.outputs.sha }}
+        run: make smoke ENV=production SHA="$SHA"

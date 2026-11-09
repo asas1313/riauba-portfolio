@@ -52,4 +52,11 @@ jobs:
       - env:
           DEPLOY_SHA: ${{ github.sha }}
         run: infra/deploy.sh staging "$DEPLOY_SHA" dist/
-      - run: make smoke ENV=staging
+      # Review finding: a step-level `env:` block is scoped to that step
+      # only -- it does not carry over to this sibling step, so SHA must
+      # be set again here for AC-8's version-check to actually run
+      # (`make smoke` only compares against /version.txt when SHA is
+      # non-empty).
+      - env:
+          SHA: ${{ github.sha }}
+        run: make smoke ENV=staging SHA="$SHA"
