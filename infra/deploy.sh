@@ -109,7 +109,7 @@ ln -sfn "../.content/$physical_name" "$tmp_release_link"
 mv -T "$tmp_release_link" "$release_dir"
 
 if [[ -n "$previous_physical_target" && "$previous_physical_target" != "../.content/$physical_name" ]]; then
-  rm -rf "$releases_dir/$previous_physical_target"
+  rm -rf "${releases_dir:?}/${previous_physical_target:?}"
 fi
 
 timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -156,7 +156,8 @@ if [[ -d "$releases_dir" ]]; then
       if [[ -L "$entry" ]]; then
         # Delete the physical content directory this release's symlink
         # points at, then the symlink itself.
-        rm -rf "$releases_dir/$(readlink "$entry")"
+        target="$(readlink "$entry")"
+        rm -rf "${releases_dir:?}/${target:?}"
       fi
       rm -rf "$entry"
     fi
