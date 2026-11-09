@@ -3,6 +3,7 @@
 Status: Final  ·  Owner: Andrius  ·  Date: 2026-11-09
 
 PR: https://github.com/asas1313/riauba-portfolio/pull/6
+Follow-up PR ("Added requirements" section below): https://github.com/asas1313/riauba-portfolio/pull/7
 
 ## Goal
 Host both staging and production of the site on Andrius' Proxmox homelab: automatic deploy to staging on
@@ -110,3 +111,10 @@ GitHub-hosted runner                         Homelab (portfolio LXC, no inbound 
 
 ## Open questions
 - None. (Andrius creates the LXC, the Cloudflare Tunnel hostnames and registers the runner manually by following the runbook.)
+
+## Added requirements
+Skripto pataisymai, kad kitą kartą klaida būtų aiški:
+
+1. Prieš install patikrinkite, ar kintamieji nustatyti, ir sustokite su aiškiu pranešimu, jei ne.
+2. Prieš reload paleiskite caddy validate --config /etc/caddy/Caddyfile. Kad validate matytų kintamuosius, jie turi būti eksportuoti ir tame shell’e.
+3. Skriptas turėtų pats sukurti drop-in’ą (arba EnvironmentFile=/etc/caddy/env) iš argumentų ar .env failo. Tada šio žingsnio nereikės daryti rankiniu būdu, o kintamieji bus viename aiškiai dokumentuotame faile.
