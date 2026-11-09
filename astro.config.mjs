@@ -116,8 +116,9 @@ function siteUrlIntegration() {
 // whenever the build ran with `NOINDEX=true` (staging: always; production:
 // driven by `PROD_NOINDEX`). The build itself produces only static files —
 // nothing serves them over HTTP at request time — so this sentinel is what
-// lets infra/Caddyfile's `@noindex { file {http.vars.webroot}/.noindex }`
-// matcher add the `X-Robots-Tag: noindex, nofollow` header per the
+// lets infra/Caddyfile's `@noindex file .noindex` matcher (resolved
+// relative to that site block's own `root`) add the
+// `X-Robots-Tag: noindex, nofollow` header per the
 // *currently deployed* release, without Caddy needing its own copy of the
 // `NOINDEX` flag. `robots.txt.ts` reads the same `NOINDEX` flag directly,
 // so the file and the header can never disagree within one release.

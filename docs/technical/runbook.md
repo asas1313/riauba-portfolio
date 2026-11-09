@@ -232,20 +232,27 @@ Claude/CI must never change repository settings on Andrius' behalf.
 every path (`* @asas1313`), so the branch ruleset's "require review from a code owner" rule
 always has someone to request review from.
 
-### `riauba-bot` machine user
+### `riauba-bot`: the runner's OS-level service account
 
-The self-hosted runner and the CODEOWNERS review flow are set up to run as **`riauba-bot`**, a
-separate GitHub machine account, not Andrius' own personal account:
+**`riauba-bot` is not a GitHub identity, and it never reviews anything.** The human reviewer for
+both the branch ruleset's code-owner requirement and the `production` environment's required
+reviewer is `@asas1313` (Andrius' own GitHub account, named in `.github/CODEOWNERS` and in the
+Environment protection setting above) — that's deliberate: approving a production deploy or a
+pull request is a decision only Andrius himself makes, never automation.
 
-- **Why separate:** the runner's registration and any automation around it should never be tied
-  to a personal account's session/credentials — if the bot account is ever compromised or needs
-  rotating, it doesn't touch Andrius' own account, and audit logs clearly distinguish "Andrius
-  acting as himself" (e.g. approving a production deploy) from "automation acting as the bot."
-- **Scope:** `riauba-bot` only needs read access to this repository (to register as a runner and
-  to be addressable for review requests) — it is not granted admin or write access.
-- **Token/PAT handling:** the self-hosted runner itself needs no GitHub token at all (it
-  authenticates its own outbound connection during the one-time `./config.sh` registration step,
-  using the short-lived registration token from step 3 above, not a long-lived PAT). If
-  `riauba-bot` is later used for anything requiring API access (e.g. automated review requests),
-  any PAT it holds is a fine-grained, repository-scoped token stored only as a GitHub
-  Environment secret — never committed, never shared with Andrius' personal account.
+`riauba-bot` is the name of the **unprivileged Linux system user** that `infra/setup-lxc.sh`
+creates on the portfolio LXC (step 2 above calls this account `deploy` in the actual script and
+systemd service — `riauba-bot` is just a more memorable name for the same account if you choose
+to rename it). It is the OS-level account the GitHub Actions runner process and every
+`infra/deploy.sh`/`infra/rollback.sh` invocation run as — never root, and never tied to any
+GitHub account at all:
+
+- **Why a dedicated OS user:** the runner process and the files it writes
+  (`/srv/riauba/<env>/releases/...`) should never run as root, and should be isolated from any
+  other service that might later run on the same LXC. If this account is ever compromised, blast
+  radius is limited to `/srv/riauba` and the runner's own working directory.
+- **No GitHub token at all:** the self-hosted runner authenticates its own outbound connection to
+  GitHub using the short-lived, single-use registration token from step 3 above (fetched by
+  Andrius from Settings → Actions → Runners), not a long-lived personal access token. Nothing on
+  the LXC — this OS user included — ever holds a GitHub credential of any kind, which is exactly
+  why the deploy workflows in this spec need no secrets.
