@@ -2,16 +2,20 @@
 
 _Architecture, module responsibilities, configuration, runbook — for riauba.org as implemented
 by spec 001 (site foundation and home page), spec 002 (CV page and PDF), spec 003 (projects
-catalogue and detail pages) and spec 005 (visual design: tokens, theme toggle, fonts, visual
-regression testing)._
+catalogue and detail pages), spec 004 (homelab hosting, staging and production deployment) and
+spec 005 (visual design: tokens, theme toggle, fonts, visual regression testing)._
 
 !!! note "Scope"
     This describes what is built today: the static site skeleton, home page, the CV page and
     downloadable PDF (`/cv`, `/cv/print`), the projects catalogue, tag filter and detail
     pages plus the "How this site was built" page (`/projects`, `/projects/tag/<tag>`,
-    `/projects/<slug>`, `/how-this-site-was-built`), and the AstroPaper-inspired visual theme
-    with a persisted light/dark toggle covering every page. Hosting and deployment are spec
-    004's scope — not built on this branch.
+    `/projects/<slug>`, `/how-this-site-was-built`), the AstroPaper-inspired visual theme
+    with a persisted light/dark toggle covering every page, and real staging/production hosting
+    on Andrius' homelab with automatic staging deploys, a manual gated production deploy and
+    instant rollback. The full operational walkthrough (LXC setup, Cloudflare Tunnel hostnames,
+    GitHub Environment configuration, first deploy, rollback, repository hardening) lives in the
+    [deployment runbook](runbook.md), not here — this page covers the application-level pieces
+    only: the `SITE_URL`/`NOINDEX` build variables and the `make smoke` command.
 
 ## Architecture overview
 
@@ -435,10 +439,31 @@ export default defineConfig({
   [Markdown body TODO stripping](#markdown-body-todo-stripping-markdown-todots) and
   [ADR-0003](../adr/0003-project-body-todo-stripping.md)'s Addendum.
 
-There are no environment variables consumed by the Astro build itself today. `make deploy` and
-`make smoke` (see below) read deployment-time shell variables (`DEPLOY_USER`, `DEPLOY_HOST`,
-`DEPLOY_PATH`, `ENV`), but actual deployment is out of scope until spec 004 — `make deploy`
-exists in the `Makefile` already but there is nothing deploy-specific in the app code yet.
+Two environment variables drive the Astro build itself (spec 004):
+
+- `SITE_URL` — the absolute origin `astro.config.mjs`'s `siteUrlIntegration` resolves via
+  `src/lib/site-url.ts`'s `resolveSiteUrl()`. Required (missing or empty both throw) for
+  `astro build`; the `Makefile`'s `build` target defaults it to `https://riauba.org` only when
+  truly unset, so a GitHub Environment variable that exists but was left empty still reaches
+  `resolveSiteUrl()` as `""` and fails the build loudly instead of silently substituting the
+  default. Every other Astro command (`dev`, `preview`, `check`, `sync`) falls back to
+  `http://localhost:4321` when unset. The deploy workflows set it per environment from each
+  GitHub Environment's `SITE_URL` variable (`vars.SITE_URL`) — see the
+  [deployment runbook](runbook.md).
+- `NOINDEX` — read as `import.meta.env.NOINDEX === "true"` by `src/pages/robots.txt.ts`
+  (`src/lib/robots.ts`'s `buildRobotsTxt()`) to decide between `Disallow: /` and `Allow: /`, and
+  by `astro.config.mjs`'s `noindexSentinelIntegration` to write an empty `dist/.noindex` sentinel
+  file that `infra/Caddyfile`'s `@noindex file .noindex` matcher turns into an
+  `X-Robots-Tag: noindex, nofollow` response header for whichever release is currently deployed —
+  so the header and `/robots.txt` can never disagree within one release. Unset locally (`make
+  build`/`make e2e` never set it, so both default to indexable); the deploy workflows set it to
+  `"true"` for staging always, and for production from the `PROD_NOINDEX` Environment variable
+  (default `"true"` until the runbook's "Switch to riauba.org" checklist flips it to `"false"`).
+
+`make smoke ENV=<staging|production> [SHA=<sha>]` (see [Runbook](#runbook) below) reads
+`STAGING_URL`/`PROD_URL` (falling back to the temporary `*.riaubyne.eu` hostnames) and, when
+given, compares the deployed `/version.txt` against `SHA` — it is a verification command, not a
+build-time one, and consumes no variables that affect the Astro build itself.
 
 ## API reference
 
@@ -457,15 +482,16 @@ Run from the repository root:
 | --- | --- |
 | `make setup` | `npm ci`, then installs the Playwright Chromium browser. |
 | `make test` | Runs Vitest unit tests (`tests/unit/`) against `src/lib/` and the content schemas. |
-| `make lint` | `astro check` (TypeScript/Astro type checking) + `eslint` + `prettier --check`. |
+| `make lint` | `astro check` (TypeScript/Astro type checking) + `eslint` + `prettier --check`, plus a syntax-only `bash -n` check of the three `infra/*.sh` scripts (full `shellcheck` runs only in CI). |
 | `make format` | `prettier --write .` |
-| `make build` | `npm run build` (`astro build` → `dist/`) then `npm run build:pdf`. |
+| `make build` | `npm run build` (`astro build` → `dist/`, with `SITE_URL` defaulted to `https://riauba.org` only when truly unset — see [Configuration](#configuration)) then `npm run build:pdf`. |
 | `make e2e` | Runs `make build` first, then the Playwright e2e suite (`tests/e2e/`), including `@axe-core/playwright` accessibility scans. |
 | `make screenshots` | Opt-in only — builds the site and regenerates `docs/user-guide/img/*.png` via a separate Playwright config (`playwright.screenshots.config.ts`). Not part of `make e2e` or CI because it overwrites tracked screenshots. |
 | `make visual` | Opt-in, requires Docker — builds the site, then runs the `tests/visual/` screenshot-regression suite against committed baselines, inside the pinned `mcr.microsoft.com/playwright` Docker image (see [Styling and fonts](#styling-and-fonts-spec-005-visual-design)). Not part of `make e2e`; `make setup` does not install Docker. |
 | `make visual-update` | Same as `make visual`, with `--update-snapshots`. The *only* supported way to change a `tests/visual/` baseline PNG — never run on a bare host. |
 | `make security` | `npm audit --audit-level=high`. |
-| `make docs` | Builds this documentation site with `mkdocs build --strict` (fails on any warning). |
+| `make docs` | Builds this documentation site with `mkdocs build --strict` (fails on any warning). `SITE_DIR` overrides the output directory (defaults to `site`); the deploy workflows set `SITE_DIR=dist/docs` so this ships inside the same build artifact, under `/docs/`. |
+| `make smoke ENV=<staging\|production> [SHA=<sha>]` | Verifies a deployed environment: checks `/`, `/cv`, `/projects`, the CV PDF and `/docs/` all return 200, optionally compares `/version.txt` to `SHA`, and for `ENV=staging` additionally requires the `X-Robots-Tag: noindex, nofollow` header. Not run locally in the normal dev loop — used by the deploy workflows and manually against a live environment. See the [deployment runbook](runbook.md). |
 
 CI (`.github/workflows/ci.yml`) runs, on every pull request and push to `main`: `make setup`,
 `make lint`, `make test`, `make security`, `make docs`, then `make e2e` (which depends on
@@ -539,7 +565,16 @@ Mechanically: any new file dropped into `content/projects/*.md` with valid front
 picked up automatically by the `glob()` loader on the next build — no code change is needed to
 register a new project.
 
-There is no deploy or rollback runbook yet: hosting, deployment and rollback are spec 004's
-scope (not built on this branch). `make deploy` and `make smoke` targets exist in the
-`Makefile` already, in anticipation of that spec, but there is no deployment pipeline wired up
-today.
+### Deploy and rollback
+
+Deployment itself has no local `make deploy` equivalent any more — the old rsync/SSH target is
+gone. Every real deploy and rollback runs from `infra/deploy.sh`/`infra/rollback.sh` on the
+self-hosted `homelab-riauba` GitHub Actions runner, triggered by `deploy-staging.yml` (automatic,
+on every push to `main`), `deploy-production.yml` (manual, `confirm=deploy`) or
+`deploy-rollback.yml` (manual, no rebuild). `make smoke ENV=<env> [SHA=<sha>]` (above) is the
+verification step those workflows run afterwards.
+
+The full operational walkthrough — provisioning the homelab LXC, registering the runner, the
+Cloudflare Tunnel hostnames, GitHub Environment configuration, first deploy, rollback, viewing
+logs, the "Switch to riauba.org" checklist and the one-time repository hardening settings — lives
+in the [deployment runbook](runbook.md), not here.

@@ -19,6 +19,22 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
       - run: make setup
       - run: make lint
+      # Spec 004, task 11: full shellcheck for the three infra/*.sh
+      # scripts -- ubuntu-latest ships shellcheck preinstalled, so this
+      # needs no new local toolchain requirement (make lint only runs
+      # `bash -n`, syntax-only, locally).
+      - run: shellcheck infra/*.sh
+      # Spec 004, task 5/11 ("Resolved decisions"): catches a
+      # infra/Caddyfile syntax error before merge, even though Caddy
+      # itself never runs anywhere else in this repo's tests. The
+      # PROD_HOSTS/STAGING_HOSTS values here are representative test
+      # values only, not the real homelab hostnames.
+      - name: Validate infra/Caddyfile
+        run: |
+          docker run --rm -v "$PWD/infra:/etc/caddy:ro" \
+            -e PROD_HOSTS=portfolio.riaubyne.eu \
+            -e STAGING_HOSTS=portfolio-staging.riaubyne.eu \
+            caddy:2 caddy validate --config /etc/caddy/Caddyfile
       - run: make test
       - run: make security
       - run: make docs

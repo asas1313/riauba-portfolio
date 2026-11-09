@@ -15,10 +15,15 @@ import { describe, expect, it } from "vitest";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 function runAstroBuild(): string {
+  // Spec 004, AC-1: `astro build` now requires SITE_URL (see
+  // src/lib/site-url.ts). This test spawns the CLI directly, bypassing the
+  // Makefile's `build` target default, so it must supply the same default
+  // itself to keep exercising its own, unrelated TODO-warning assertion.
   return execFileSync("npx", ["astro", "build"], {
     cwd: repoRoot,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, SITE_URL: "https://riauba.org" },
   }).toString();
 }
 
