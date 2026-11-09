@@ -77,8 +77,25 @@ cd /tmp/riauba-portfolio
 
 This idempotent script (safe to run again any time, e.g. after a `Caddyfile` change) creates the
 unprivileged `deploy` system user, `/srv/riauba/{staging,production}/releases` owned by it,
-installs Caddy from its official apt repository, installs `infra/Caddyfile` to
-`/etc/caddy/Caddyfile` and reloads it, then prints the exact commands for the next step.
+installs Caddy from its official apt repository, generates `/etc/caddy/env` and the systemd
+drop-in that wires it into Caddy's unit (see step 5 below), validates and installs
+`infra/Caddyfile` to `/etc/caddy/Caddyfile`, and reloads/restarts Caddy, then prints the exact
+commands for the next step.
+
+`infra/production.env` (`PROD_HOSTS=riauba.org`) and `infra/staging.env`
+(`STAGING_HOSTS=staging.riauba.org`) are checked into the repo and read automatically by the
+script — there is no manual variable-setting step before or during this run.
+
+!!! warning "Cloudflare Tunnel hostnames must match"
+    `infra/production.env`/`infra/staging.env` are already set to the spec's final **"Later"**
+    hostnames (`riauba.org`/`staging.riauba.org`), not the temporary `*.riaubyne.eu` ones used
+    elsewhere on this page until the Cloudflare/DNS cutover (see the "Switch to riauba.org"
+    checklist below). This means running `infra/setup-lxc.sh` performs the Caddy-side half of
+    that cutover immediately: Caddy will only match requests for `riauba.org`/`staging.riauba.org`.
+    Before or at the same time you run this script, update the Cloudflare Tunnel's public-hostname
+    routing (step 4 below) to point at `riauba.org`/`staging.riauba.org` too — otherwise the
+    temporary `*.riaubyne.eu` hostnames the rest of this runbook assumes will stop resolving to
+    anything Caddy matches.
 
 ## 3. Register the GitHub Actions runner
 
@@ -112,16 +129,18 @@ In the GitHub repository's **Settings → Environments**, configure both `stagin
 `production` (create them if they don't exist yet) with these **Environment variables** (not
 secrets — none are needed):
 
-| Environment | `SITE_URL` | `PROD_NOINDEX` | `PROD_HOSTS` / `STAGING_HOSTS` |
-| --- | --- | --- | --- |
-| `staging` | `https://portfolio-staging.riaubyne.eu` | n/a | `STAGING_HOSTS=portfolio-staging.riaubyne.eu` (set once on the LXC, see below) |
-| `production` | `https://portfolio.riaubyne.eu` | `true` | `PROD_HOSTS=portfolio.riaubyne.eu` (set once on the LXC, see below) |
+| Environment | `SITE_URL` | `PROD_NOINDEX` |
+| --- | --- | --- |
+| `staging` | `https://portfolio-staging.riaubyne.eu` | n/a |
+| `production` | `https://portfolio.riaubyne.eu` | `true` |
 
 `SITE_URL` and `PROD_NOINDEX` are read by the deploy workflows (`vars.SITE_URL`,
 `vars.PROD_NOINDEX`) and passed to `make build`. `PROD_HOSTS`/`STAGING_HOSTS` are **not** GitHub
-Environment variables — they're plain environment variables exported wherever Caddy itself runs
-(e.g. in `/etc/default/caddy` or the systemd unit's `Environment=` on the LXC), since only Caddy
-reads them (see `infra/Caddyfile`).
+Environment variables — only Caddy reads them (see `infra/Caddyfile`), and they live in the two
+checked-in files `infra/production.env`/`infra/staging.env`, read automatically by
+`infra/setup-lxc.sh` and merged into the systemd `EnvironmentFile` at `/etc/caddy/env`. To change
+either hostname later, edit the corresponding file directly, then either re-run
+`infra/setup-lxc.sh`, or run `systemctl daemon-reload && systemctl restart caddy` yourself.
 
 ## 6. First deploy
 
@@ -158,29 +177,44 @@ journalctl -u actions.runner.* -f    # the GitHub Actions runner service
 environment; `/srv/riauba/<env>/DEPLOYED` always holds the sha and UTC timestamp of the release
 `current` points at right now.
 
+`infra/setup-lxc.sh` validates the Caddyfile (`caddy validate --config`, with `PROD_HOSTS`/
+`STAGING_HOSTS` exported into that same shell) against its *source* copy in the repo checkout
+before ever installing it to `/etc/caddy/Caddyfile` — a validation failure is never installed and
+never touches the running Caddy service, so if `journalctl -u caddy` shows Caddy still serving an
+old config after a script run, check the script's own output first for a validate error. The
+resolved hostnames are merged into `/etc/caddy/env` (a systemd `EnvironmentFile`, mode `0600`,
+owned by root) and wired into Caddy's unit via the drop-in
+`/etc/systemd/system/caddy.service.d/10-riauba-env.conf`; the script only restarts Caddy (instead
+of the cheaper `systemctl reload`) when either file's content actually changed in that run —
+`caddy reload`'s live config hot-swap never re-reads a systemd `EnvironmentFile`.
+
 ## "Switch to riauba.org" checklist
 
 Spec 004's third user story: moving production from the temporary `portfolio.riaubyne.eu`
 hostname to the real `riauba.org` domain must be a configuration change only, never a code
 change.
 
+**The Caddy-side step is already done** as of
+`docs/specs/004-deployment-setup-lxc-fixes.plan.md`: `infra/production.env`/`infra/staging.env`
+already contain `PROD_HOSTS=riauba.org`/`STAGING_HOSTS=staging.riauba.org`, read automatically by
+`infra/setup-lxc.sh`. The remaining checklist items below are all Cloudflare-side.
+
 1. Add the `riauba.org` domain to the Cloudflare account (Cloudflare dashboard → Add a site),
    and point its nameservers at Cloudflare per Cloudflare's own onboarding instructions.
 2. Add two new Cloudflare Tunnel public hostnames, same pattern as step 4 above:
    `riauba.org` and `staging.riauba.org` → the portfolio LXC's Caddy. Also add `www.riauba.org`
-   as a redirect to `riauba.org` (Cloudflare's own redirect rules, not Caddy).
-3. Update `PROD_HOSTS` (on the LXC, where Caddy reads it) to include `riauba.org` — Caddy's
-   site-address list is comma-separated, so this can be `riauba.org,portfolio.riaubyne.eu` during
-   a transition period, or just `riauba.org` once the temporary hostname is retired. Update
-   `STAGING_HOSTS` similarly to include `staging.riauba.org`.
-4. Update the `production` GitHub Environment's `SITE_URL` variable to `https://riauba.org`
+   as a redirect to `riauba.org` (Cloudflare's own redirect rules, not Caddy). ⚠️ Until this step
+   is done, Caddy already only matches `riauba.org`/`staging.riauba.org` (see the warning in
+   step 2 above) — the temporary `*.riaubyne.eu` hostnames will not resolve to anything Caddy
+   matches in the meantime.
+3. Update the `production` GitHub Environment's `SITE_URL` variable to `https://riauba.org`
    (and `staging`'s to `https://staging.riauba.org`).
-5. Set the `production` Environment's `PROD_NOINDEX` variable to `false` — production is now
+4. Set the `production` Environment's `PROD_NOINDEX` variable to `false` — production is now
    meant to be indexed by search engines.
-6. Redeploy production (**Actions → deploy-production → Run workflow**, `confirm=deploy`) so the
+5. Redeploy production (**Actions → deploy-production → Run workflow**, `confirm=deploy`) so the
    next build picks up the new `SITE_URL` (canonical/OG URLs) and `PROD_NOINDEX=false` (the
    `dist/.noindex` sentinel is no longer written, so Caddy stops sending the noindex header).
-7. Verify: `make smoke ENV=production` (with `PROD_URL=https://riauba.org` exported locally, or
+6. Verify: `make smoke ENV=production` (with `PROD_URL=https://riauba.org` exported locally, or
    just `curl -I https://riauba.org/`) — confirm `X-Robots-Tag` is **absent**, `/robots.txt`
    now says `Allow: /`, and the canonical URL in the page source reads `https://riauba.org/...`.
 
