@@ -52,8 +52,14 @@ visual-update: build
 		-v "$$PWD:/work" -w /work $(PLAYWRIGHT_DOCKER_IMAGE) \
 		npx playwright test --config=playwright.visual.config.ts --update-snapshots
 
+# Spec 004, task 11: syntax-only (`bash -n`) checking of the three
+# infra/*.sh scripts, locally -- full `shellcheck` only runs in CI
+# (.github/workflows/ci.yml), since `shellcheck` isn't installed by
+# `make setup` and these scripts aren't run more than a handful of times
+# ever.
 lint:
-	npx astro check && npx eslint . && npx prettier --check .
+	npx astro check && npx eslint . && npx prettier --check . && \
+		bash -n infra/setup-lxc.sh && bash -n infra/deploy.sh && bash -n infra/rollback.sh
 
 lint-changed:
 	@$(MAKE) -s lint
