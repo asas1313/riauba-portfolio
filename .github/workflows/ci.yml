@@ -35,6 +35,20 @@ jobs:
             -e PROD_HOSTS=portfolio.riaubyne.eu \
             -e STAGING_HOSTS=portfolio-staging.riaubyne.eu \
             caddy:2 caddy validate --config /etc/caddy/Caddyfile
+      # docs/specs/004-deployment-setup-lxc-fixes.plan.md, task 11: proves
+      # the exact failure mode that caused Andrius' original unclear
+      # error (PROD_HOSTS/STAGING_HOSTS missing from Caddy's own process
+      # environment) is actually caught by `caddy validate` itself, not
+      # just that the happy-path invocation above passes. STAGING_HOSTS
+      # is deliberately left unset; `caddy validate` must exit non-zero.
+      - name: Validate infra/Caddyfile fails when a required variable is missing
+        run: |
+          if docker run --rm -v "$PWD/infra:/etc/caddy:ro" \
+            -e PROD_HOSTS=portfolio.riaubyne.eu \
+            caddy:2 caddy validate --config /etc/caddy/Caddyfile; then
+            echo "expected caddy validate to fail with STAGING_HOSTS unset, but it succeeded" >&2
+            exit 1
+          fi
       - run: make test
       - run: make security
       - run: make docs
