@@ -131,6 +131,12 @@ for var in "${required_vars[@]}"; do
   value=""
   if grep -qE "^${var}=" "$file_path"; then
     value="$(grep -E "^${var}=" "$file_path" | tail -n1 | cut -d= -f2-)"
+    # Strip a trailing CR (a file edited/saved with CRLF line endings) and
+    # any trailing whitespace -- this value ends up both in /etc/caddy/env
+    # and directly in a Caddy site address, where trailing whitespace
+    # would otherwise silently become part of the hostname.
+    value="${value%$'\r'}"
+    value="${value%"${value##*[![:space:]]}"}"
   fi
 
   if [[ -z "$value" ]]; then
