@@ -10,3 +10,4 @@ Profile.pdf
 .astro/
 test-results/
 playwright-report/
+*.code-workspace
