@@ -1,0 +1,34 @@
+# Spec 004, AC-5: manual rollback, no rebuild -- just repoints `current` on
+# the homelab via infra/rollback.sh. The chosen environment input doubles
+# as the GitHub Environment name itself (`staging`/`production` are
+# exactly the two configured environments), so `environment:
+# ${{ inputs.env }}` alone gives the production-targeting run
+# `environment: production` protection (required reviewer, once Andrius
+# configures that environment protection rule -- see the runbook's
+# "Repository hardening" section) without a separate conditional.
+name: deploy-rollback
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment to roll back (staging or production)"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      sha:
+        description: "Optional: exact release sha to roll back to (default: the previous release)"
+        required: false
+jobs:
+  rollback:
+    # Security hardening: only Andrius' own actions can ever cause this
+    # workflow to execute on the homelab runner, regardless of who can
+    # trigger workflow_dispatch itself.
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, homelab-riauba]
+    environment: ${{ github.event.inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Roll back
+        run: infra/rollback.sh "${{ github.event.inputs.env }}" "${{ github.event.inputs.sha }}"
