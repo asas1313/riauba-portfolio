@@ -2,6 +2,62 @@
 
 ## Unreleased
 
+### Added (spec 004 — homelab hosting, staging and production deployment)
+
+- Real hosting: both staging and production now run on Andrius' Proxmox homelab, served by Caddy
+  behind the existing Cloudflare Tunnel (`vepryne-pve`), with TLS terminating at Cloudflare and no
+  inbound port open on the portfolio LXC at all. Temporary `portfolio.riaubyne.eu`/
+  `portfolio-staging.riaubyne.eu` hostnames are used until `riauba.org` DNS is live; switching to
+  the real domain is documented as a configuration-only change — see
+  [ADR-0005](adr/0005-homelab-self-hosted-runner-deployment.md) and the new
+  [deployment runbook](technical/runbook.md).
+- Deploys run on a self-hosted GitHub Actions runner (`homelab-riauba`, unprivileged `deploy` OS
+  user) that only ever connects outbound to GitHub — no SSH keys, no open inbound ports and no
+  deploy secrets exist anywhere in this setup. The build itself always happens on a GitHub-hosted
+  runner; the homelab runner only ever receives a finished `dist/` artifact.
+- `deploy-staging.yml` deploys automatically on every push to `main`; `deploy-production.yml` is a
+  manual `workflow_dispatch` requiring `confirm=deploy`, defaulting to the sha currently live on
+  staging and refusing any ref that isn't an ancestor of `origin/main`; `deploy-rollback.yml` is a
+  manual, no-rebuild rollback for either environment. All three are gated so only Andrius' own
+  actions (`github.actor == github.repository_owner`) can ever reach the homelab runner.
+- `infra/deploy.sh` writes immutable, SHA-named releases under
+  `/srv/riauba/<env>/releases/<sha>/` (each a symlink into a sibling `.content/<sha>.<nonce>/`
+  directory, built fully off to the side and swapped in with a single atomic `mv -T`, so even a
+  redeploy of an already-current sha never exposes an empty or partially-written release to
+  Caddy) and atomically repoints `current` at it the same way. An append-only `releases.log`
+  drives both pruning (keep the 5 most-recently-logged releases, by log order, never directory
+  mtime) and an unconditional orphan-GC sweep of `.content/` on every run, so a deploy killed
+  between writing its content and swapping its symlink never leaks disk space. `infra/rollback.sh`
+  repoints `current` with no rebuild, either to an explicit sha or — using a hybrid rule over
+  `releases.log`'s three action types (`deploy`, `rollback-explicit`, `rollback-auto`) — to
+  whichever release was actually live immediately before the current one, including after a
+  deploy-on-top-of-a-rollback or a rollback-of-a-rollback.
+- `SITE_URL` (required for `astro build`, defaulted locally by `make build`) and `NOINDEX`
+  build-time variables (`src/lib/site-url.ts`, `src/lib/robots.ts`, `src/pages/robots.txt.ts`,
+  `astro.config.mjs`'s `astro:build:done` hook) drive per-environment canonical/Open Graph URLs,
+  `/robots.txt` and a `dist/.noindex` sentinel that `infra/Caddyfile` turns into an
+  `X-Robots-Tag: noindex, nofollow` header on the currently deployed release — staging always
+  noindexed, production until the "Switch to riauba.org" checklist flips `PROD_NOINDEX` to
+  `false`.
+- `infra/Caddyfile` (shared by both environments, installed by the new idempotent
+  `infra/setup-lxc.sh`) serves a strict Content-Security-Policy with `sha256` hashes for the two
+  inline scripts shipped by spec 005 (never `unsafe-inline`), plus `X-Content-Type-Options`,
+  `Referrer-Policy`, `Permissions-Policy`, immutable long-cache headers for hashed `_astro/*`
+  assets, and a custom static 404 page.
+- `make smoke ENV=<staging|production> [SHA=<sha>]` replaces the old rsync/SSH `make deploy`
+  target (deleted — there is no local equivalent any more; deploying only ever happens via
+  `infra/deploy.sh` on the homelab runner itself). It checks the key routes return 200, optionally
+  compares `/version.txt` against `SHA`, and on staging additionally requires the noindex header.
+  `make docs` gained a `SITE_DIR` override so the deploy workflows can build the MkDocs site
+  straight into `dist/docs/`.
+- Security hardening beyond the spec's own acceptance criteria: a main-branch ruleset requiring
+  PR review from a code owner (`.github/CODEOWNERS`, `@asas1313`) and a passing `ci` check; a
+  required human reviewer on the `production` GitHub Environment before any job targeting it runs;
+  Actions settings preventing a workflow from ever approving its own PR; and script-injection-safe
+  workflow inputs (`env:` + quoted shell variables, never a raw `${{ }}` interpolated into `run:`
+  text) throughout the three deploy workflows. See the runbook's "Repository hardening" section
+  for the full, one-time manual checklist.
+
 ### Added (spec 005 — visual design)
 
 - A calm, professional, AstroPaper-inspired visual theme ported as a visual layer only (design
