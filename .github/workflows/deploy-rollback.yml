@@ -20,6 +20,14 @@ on:
       sha:
         description: "Optional: exact release sha to roll back to (default: the previous release)"
         required: false
+# Defense in depth: infra/rollback.sh has no locking of its own, and this
+# workflow shares its concurrency group with whichever of
+# deploy-staging.yml/deploy-production.yml targets the same environment,
+# so a rollback can never race a deploy (or another rollback) against the
+# same environment and leave `current` pointing at a deleted directory.
+concurrency:
+  group: deploy-${{ github.event.inputs.env }}
+  cancel-in-progress: false
 jobs:
   rollback:
     # Security hardening: only Andrius' own actions can ever cause this
@@ -31,4 +39,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Roll back
-        run: infra/rollback.sh "${{ github.event.inputs.env }}" "${{ github.event.inputs.sha }}"
+        # Spec 004, security hardening: never interpolate free-form
+        # workflow_dispatch inputs directly into `run:` text (the
+        # documented GitHub Actions script-injection anti-pattern) --
+        # pass them through `env:` and reference them as quoted shell
+        # variables instead.
+        env:
+          ENV_INPUT: ${{ github.event.inputs.env }}
+          SHA_INPUT: ${{ github.event.inputs.sha }}
+        run: infra/rollback.sh "$ENV_INPUT" "$SHA_INPUT"

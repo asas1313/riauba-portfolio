@@ -6,6 +6,14 @@ name: deploy-staging
 on:
   push:
     branches: [main]
+# Defense in depth: infra/deploy.sh's pruning step (`rm -rf` on computed
+# non-keep releases) has no locking of its own, so two overlapping runs
+# against staging could race and leave `current` pointing at a deleted
+# directory. Serialize (never cancel) runs instead -- the same group name
+# deploy-rollback.yml uses when its `env` input is "staging".
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +25,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: make setup
-      - run: SITE_URL=${{ vars.SITE_URL }} NOINDEX=true make build
+      - env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          NOINDEX: "true"
+        run: make build
       - run: make docs SITE_DIR=dist/docs
       - uses: actions/upload-artifact@v4
         with:
@@ -38,5 +49,7 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: infra/deploy.sh staging ${{ github.sha }} dist/
+      - env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: infra/deploy.sh staging "$DEPLOY_SHA" dist/
       - run: make smoke ENV=staging

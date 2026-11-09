@@ -16,6 +16,16 @@ on:
       ref:
         description: "Optional: exact commit sha to deploy (default: the sha currently live on staging)"
         required: false
+# Defense in depth: infra/deploy.sh's pruning step (`rm -rf` on computed
+# non-keep releases) has no locking of its own, so two overlapping
+# deploy/rollback runs against the same environment could race and leave
+# `current` pointing at a deleted directory. Serialize (never cancel) runs
+# per environment instead -- the same group name deploy-rollback.yml uses
+# when its `env` input is "production", so a production deploy and a
+# production rollback can never race each other either.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 jobs:
   resolve-ref:
     if: github.event.inputs.confirm == 'deploy' && github.actor == github.repository_owner
@@ -27,9 +37,17 @@ jobs:
         with:
           fetch-depth: 0
       - id: resolve
+        # Spec 004, security hardening: never interpolate a free-form
+        # workflow_dispatch input directly into `run:` text (the
+        # documented GitHub Actions script-injection anti-pattern -- a
+        # crafted `ref` value could otherwise execute arbitrary shell on
+        # the homelab runner). Pass it through `env:` and reference it as
+        # a quoted shell variable instead.
+        env:
+          REF_INPUT: ${{ github.event.inputs.ref }}
         run: |
-          if [ -n "${{ github.event.inputs.ref }}" ]; then
-            sha="${{ github.event.inputs.ref }}"
+          if [ -n "$REF_INPUT" ]; then
+            sha="$REF_INPUT"
           else
             sha="$(cut -d' ' -f1 /srv/riauba/staging/DEPLOYED)"
           fi
@@ -53,7 +71,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: make setup
-      - run: SITE_URL=${{ vars.SITE_URL }} NOINDEX=${{ vars.PROD_NOINDEX || 'true' }} make build
+      - env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          NOINDEX: ${{ vars.PROD_NOINDEX || 'true' }}
+        run: make build
       - run: make docs SITE_DIR=dist/docs
       - uses: actions/upload-artifact@v4
         with:
@@ -73,5 +94,7 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: infra/deploy.sh production ${{ needs.resolve-ref.outputs.sha }} dist/
+      - env:
+          RESOLVED_SHA: ${{ needs.resolve-ref.outputs.sha }}
+        run: infra/deploy.sh production "$RESOLVED_SHA" dist/
       - run: make smoke ENV=production
