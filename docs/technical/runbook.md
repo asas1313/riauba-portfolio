@@ -65,9 +65,11 @@ flowchart LR
 
 ## 2. Run `infra/setup-lxc.sh`
 
-Inside the LXC, as root:
+Inside the LXC, as root (a fresh Debian template doesn't ship `git` by default, and the GitHub
+Actions runner needs it too, for `actions/checkout` in every workflow run):
 
 ```sh
+apt-get update && apt-get install -y git
 git clone https://github.com/<owner>/riauba-portfolio.git /tmp/riauba-portfolio
 cd /tmp/riauba-portfolio
 ./infra/setup-lxc.sh
