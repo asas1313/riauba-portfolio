@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
   existsSync,
   mkdtempSync,
@@ -181,6 +181,100 @@ describe("infra/deploy.sh (AC-4)", () => {
     const releases = readdirSync(join(root, "staging", "releases"));
     expect(releases).not.toContain("sha1");
     expect(releases).toHaveLength(5);
+  });
+
+  it("redeploying the same already-current sha ends with the new content live", () => {
+    // Deterministic end-state check for "deploy the same sha twice in a
+    // row" (e.g. a re-run of a failed workflow, or a resolved production
+    // sha that happens to already be live): the second deploy's content
+    // must win, releases.log gets one line per call, and the sha is
+    // never pruned (it's always `current`'s own target).
+    const sha = "shaRedeployed";
+    runDeploy("staging", sha, makeDistDir("v1"));
+    expect(
+      readFileSync(
+        join(root, "staging", "releases", sha, "index.html"),
+        "utf-8",
+      ),
+    ).toBe("v1");
+
+    const result = runDeploy("staging", sha, makeDistDir("v2"));
+    expect(result.status).toBe(0);
+    expect(
+      readFileSync(
+        join(root, "staging", "releases", sha, "index.html"),
+        "utf-8",
+      ),
+    ).toBe("v2");
+    expect(readlinkSync(join(root, "staging", "current"))).toBe(
+      `releases/${sha}`,
+    );
+
+    const log = readFileSync(join(root, "staging", "releases.log"), "utf-8");
+    expect(log.trim().split("\n")).toHaveLength(2);
+  });
+
+  it("redeploying the sha that current already points at never exposes an empty or partial release directory (AC-4 atomicity)", async () => {
+    // Regression test (review finding): infra/deploy.sh used to
+    // `rm -rf releases/<sha>` followed by `cp -a` straight into place,
+    // leaving a window where `current` pointed at an empty/partial
+    // directory while redeploying a sha that was already live (e.g. a
+    // re-run of a failed workflow). A large-enough dist dir makes that
+    // window observable by a tight concurrent poll if it exists; the
+    // fixed implementation (build into a temp dir, then `mv -T` into
+    // place) never creates such a window at all, so this never flakes
+    // on correct code -- it can only fail to catch a reintroduced bug if
+    // the copy is implausibly fast.
+    const sha = "shaAtomicRedeploy";
+    const fileCount = 400;
+
+    function makeBigDistDir(tag: string): string {
+      const dir = mkdtempSync(join(tmpdir(), "riauba-dist-big-"));
+      for (let i = 0; i < fileCount; i += 1) {
+        writeFileSync(join(dir, `file-${i}.txt`), `${tag}-${i}`);
+      }
+      return dir;
+    }
+
+    runDeploy("staging", sha, makeBigDistDir("v1"));
+    expect(readlinkSync(join(root, "staging", "current"))).toBe(
+      `releases/${sha}`,
+    );
+
+    const releaseDir = join(root, "staging", "releases", sha);
+    const expectedFullCount = fileCount + 1; // + version.txt
+
+    let sawEmptyWindow = false;
+    let sawPartialWindow = false;
+    const poll = setInterval(() => {
+      if (!existsSync(releaseDir)) {
+        sawEmptyWindow = true;
+        return;
+      }
+      const entryCount = readdirSync(releaseDir).length;
+      if (entryCount > 0 && entryCount < expectedFullCount) {
+        sawPartialWindow = true;
+      }
+    }, 0);
+
+    try {
+      const child = spawn(
+        deployScript,
+        ["staging", sha, makeBigDistDir("v2")],
+        { env: { ...process.env, RIAUBA_ROOT: root } },
+      );
+      const exitCode: number = await new Promise((resolve, reject) => {
+        child.on("error", reject);
+        child.on("exit", (code) => resolve(code ?? -1));
+      });
+      expect(exitCode).toBe(0);
+    } finally {
+      clearInterval(poll);
+    }
+
+    expect(sawEmptyWindow).toBe(false);
+    expect(sawPartialWindow).toBe(false);
+    expect(readFileSync(join(releaseDir, "file-0.txt"), "utf-8")).toBe("v2-0");
   });
 
   it("creates a fresh releases dir structure per environment", () => {

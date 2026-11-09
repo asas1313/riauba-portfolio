@@ -14,6 +14,27 @@
 # always keeping whichever release `current` now points at, and writes
 # DEPLOYED. Exits 2 (writing nothing) for any env other than
 # staging|production.
+#
+# Review finding: redeploying a sha that's already on disk (e.g. a
+# re-run of a failed workflow, or a resolved production sha that happens
+# to already be live) used to `rm -rf releases/<sha>` followed by
+# `cp -a` straight into place -- a window, proportional to the copy's
+# size, where `releases/<sha>/` (and therefore `current`, if it was
+# already pointing there) was empty or partially written, which Caddy
+# could serve errors against. `releases/<sha>` is therefore never a real
+# directory any more: it's a symlink into `../.content/<sha>.<nonce>/`
+# (a sibling of `releases/`, so it never appears in a `releases/`
+# directory listing), built fully off to the side and switched with the
+# exact same tmp-symlink + `mv -T` pattern already used for `current`
+# below -- one single atomic rename, the same guarantee `current` itself
+# gets, with no multi-step swap and therefore no window at all (not even
+# a negligible one -- two sequential `mv` *processes*, each with their
+# own fork/exec overhead, are not actually "instantaneous", which an
+# earlier version of this fix learned the hard way; see
+# tests/unit/infra-deploy.test.ts's atomicity regression test). Any
+# previous physical content directory a redeployed sha pointed at is
+# deleted only *after* the symlink has already moved on, so it's always
+# genuinely unreferenced by that point.
 set -euo pipefail
 
 root="${RIAUBA_ROOT:-/srv/riauba}"
@@ -42,15 +63,39 @@ fi
 env_dir="$root/$env_name"
 releases_dir="$env_dir/releases"
 release_dir="$releases_dir/$sha"
+content_dir="$env_dir/.content"
 log_file="$env_dir/releases.log"
 current_link="$env_dir/current"
 deployed_file="$env_dir/DEPLOYED"
 
-mkdir -p "$releases_dir"
+mkdir -p "$releases_dir" "$content_dir"
 
-rm -rf "$release_dir"
-cp -a "$dist_dir" "$release_dir"
-printf '%s' "$sha" >"$release_dir/version.txt"
+# Build the real content fully off to the side, under a unique name --
+# even a redeploy of the same sha gets a brand new physical directory,
+# never the one `releases/<sha>` (and therefore possibly `current`) might
+# already be pointing at.
+physical_name="$sha.$$"
+physical_dir="$content_dir/$physical_name"
+rm -rf "$physical_dir"
+cp -a "$dist_dir" "$physical_dir"
+printf '%s' "$sha" >"$physical_dir/version.txt"
+
+# Remember what releases/<sha> pointed at before (if anything), so it can
+# be cleaned up once it's safely unreferenced -- then atomically repoint
+# releases/<sha> itself at the new physical directory via the same
+# tmp-symlink + `mv -T` pattern as the `current` switch below.
+previous_physical_target=""
+if [[ -L "$release_dir" ]]; then
+  previous_physical_target="$(readlink "$release_dir")"
+fi
+
+tmp_release_link="$releases_dir/.tmp.$sha.$$"
+ln -sfn "../.content/$physical_name" "$tmp_release_link"
+mv -T "$tmp_release_link" "$release_dir"
+
+if [[ -n "$previous_physical_target" && "$previous_physical_target" != "../.content/$physical_name" ]]; then
+  rm -rf "$releases_dir/$previous_physical_target"
+fi
 
 timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf '%s  %s  deploy\n' "$sha" "$timestamp" >>"$log_file"
@@ -89,11 +134,16 @@ for s in "${ranked_shas[@]}"; do
 done
 
 if [[ -d "$releases_dir" ]]; then
-  for dir in "$releases_dir"/*/; do
-    [[ -d "$dir" ]] || continue
-    name="$(basename "$dir")"
+  for entry in "$releases_dir"/*; do
+    [[ -e "$entry" ]] || continue
+    name="$(basename "$entry")"
     if [[ -z "${keep[$name]:-}" ]]; then
-      rm -rf "$dir"
+      if [[ -L "$entry" ]]; then
+        # Delete the physical content directory this release's symlink
+        # points at, then the symlink itself.
+        rm -rf "$releases_dir/$(readlink "$entry")"
+      fi
+      rm -rf "$entry"
     fi
   done
 fi
