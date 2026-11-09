@@ -66,25 +66,33 @@
 #   [Service]
 #   EnvironmentFile=/etc/caddy/env
 #
-# Both are rewritten on every run from the currently-resolved values
-# (idempotent). Whether either file's *content* actually changed this run
-# is tracked explicitly, because that -- not merely "the Caddyfile
-# changed" -- decides reload vs. restart below: a systemd EnvironmentFile
-# is only ever read when the unit's process starts, never re-read by
-# `caddy reload`'s own live-config hot-swap (its admin API), so a changed
-# hostname value needs a real `systemctl restart caddy` to take effect.
+# Both are rewritten on every successful run from the currently-resolved
+# values (idempotent), each atomically via mktemp + `mv -T` (the same
+# atomic-rename convention infra/deploy.sh/infra/rollback.sh already use
+# for `current`). Whether either file's *content* would actually change
+# this run is computed up front, read-only, before anything is written
+# (see "Validate before writing anything" below) -- because that, not
+# merely "the Caddyfile changed," decides reload vs. restart: a systemd
+# EnvironmentFile is only ever read when the unit's process starts, never
+# re-read by `caddy reload`'s own live-config hot-swap (its admin API),
+# so a changed hostname value needs a real `systemctl restart caddy` to
+# take effect.
 #
 # ---------------------------------------------------------------------------
-# Validate before install, install before reload/restart
+# Validate before writing anything, install before reload/restart
 # ---------------------------------------------------------------------------
 # The Caddyfile is validated (`caddy validate --config`, with the
 # resolved variables exported into this same shell so validation actually
-# sees them) from its *source* location in the repo checkout, BEFORE it
-# is ever installed to /etc/caddy/Caddyfile -- not installed-then-gated-
-# on-reload. On failure, this exits non-zero without installing anything
-# or touching the running Caddy service at all, so a bad Caddyfile is
-# never even placed at the live config path where someone might assume
-# it's already active. Only on success does `install -m 0644` happen.
+# sees them) from its *source* location in the repo checkout, BEFORE
+# /etc/caddy/env or the drop-in are written, and BEFORE it is ever
+# installed to /etc/caddy/Caddyfile -- not "write the env file, then
+# validate," and not "install unconditionally, gate only the reload." On
+# failure, this exits non-zero having written nothing at all: no env
+# file, no drop-in, no installed Caddyfile, no systemctl action -- so a
+# bad Caddyfile (or a bad resolved variable) never even gets as far as
+# changing anything on disk, let alone the live config path where
+# someone might assume it's already active. Only on success do the env
+# file, drop-in and `install -m 0644` all happen.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -190,11 +198,15 @@ else
   echo "setup-lxc.sh: installed caddy ($(caddy version))"
 fi
 
-# 4. Merge the resolved variables into the single systemd EnvironmentFile
-#    Caddy's unit actually reads, and the drop-in that wires it in. Both
-#    are rewritten unconditionally (idempotent), but whether their
-#    *content* changed this run is tracked, since that decides
-#    reload-vs-restart below -- not merely whether the Caddyfile changed.
+# 4. Compute what the resolved variables want written to the systemd
+#    EnvironmentFile and the drop-in, and whether that would change
+#    what's currently on disk -- READ-ONLY at this point, nothing is
+#    written yet. This must happen before validate (task 5) so that a
+#    validate failure leaves the filesystem completely untouched: not
+#    just the installed Caddyfile/running caddy service, but also
+#    /etc/caddy/env and the drop-in, which a naive "write env, then
+#    validate" ordering would already have overwritten with this run's
+#    values even on a validate failure.
 caddy_env_file="/etc/caddy/env"
 caddy_dropin_dir="/etc/systemd/system/caddy.service.d"
 caddy_dropin_file="$caddy_dropin_dir/10-riauba-env.conf"
@@ -216,13 +228,6 @@ if [[ "$old_env_content" != "$new_env_content" ]]; then
   env_changed=1
 fi
 
-mkdir -p "$(dirname "$caddy_env_file")"
-tmp_env_file="$(mktemp "${caddy_env_file}.XXXXXX")"
-printf '%s\n' "$new_env_content" >"$tmp_env_file"
-chmod 0600 "$tmp_env_file"
-chown root:root "$tmp_env_file"
-mv -T "$tmp_env_file" "$caddy_env_file"
-
 new_dropin_content="[Service]
 EnvironmentFile=/etc/caddy/env"
 
@@ -236,27 +241,45 @@ if [[ "$old_dropin_content" != "$new_dropin_content" ]]; then
   dropin_changed=1
 fi
 
-mkdir -p "$caddy_dropin_dir"
-printf '%s\n' "$new_dropin_content" >"$caddy_dropin_file"
-
-if [[ "$env_changed" -eq 1 || "$dropin_changed" -eq 1 ]]; then
-  echo "setup-lxc.sh: $caddy_env_file or $caddy_dropin_file content changed, will daemon-reload + restart caddy"
-fi
-
-# 5. Validate the *source* Caddyfile (still in the repo checkout) before
-#    ever installing it to /etc/caddy/Caddyfile -- on failure, nothing is
-#    installed and the running caddy service is left completely alone.
+# 5. Validate the *source* Caddyfile (still in the repo checkout) BEFORE
+#    writing anything at all -- not just before install/reload, and not
+#    just before the env file/drop-in writes in step 6 below. On
+#    failure: no /etc/caddy/env write, no drop-in write, no Caddyfile
+#    install, no systemctl action of any kind -- the running caddy
+#    service and everything already on disk is left completely alone.
 if ! caddy validate --config "$script_dir/Caddyfile"; then
-  echo "setup-lxc.sh: caddy validate failed for $script_dir/Caddyfile -- NOT installed, caddy service left untouched" >&2
+  echo "setup-lxc.sh: caddy validate failed for $script_dir/Caddyfile -- nothing written, caddy service left untouched" >&2
   exit 1
 fi
 
+# 6. Only on a successful validate: write /etc/caddy/env and the drop-in,
+#    each atomically via mktemp (in the same destination directory, so
+#    `mv -T` is always a same-filesystem rename) + `mv -T` into place --
+#    the same atomic-rename convention infra/deploy.sh/infra/rollback.sh
+#    already use for `current`, now applied consistently to both of
+#    these files rather than just the env file. Both are rewritten
+#    unconditionally on every successful run (idempotent); env_changed/
+#    dropin_changed (computed in step 4, before validate) are what
+#    actually decide reload-vs-restart in step 7 below.
+mkdir -p "$(dirname "$caddy_env_file")"
+tmp_env_file="$(mktemp "${caddy_env_file}.XXXXXX")"
+printf '%s\n' "$new_env_content" >"$tmp_env_file"
+chmod 0600 "$tmp_env_file"
+chown root:root "$tmp_env_file"
+mv -T "$tmp_env_file" "$caddy_env_file"
+
+mkdir -p "$caddy_dropin_dir"
+tmp_dropin_file="$(mktemp "${caddy_dropin_file}.XXXXXX")"
+printf '%s\n' "$new_dropin_content" >"$tmp_dropin_file"
+chmod 0644 "$tmp_dropin_file"
+mv -T "$tmp_dropin_file" "$caddy_dropin_file"
+
 install -m 0644 "$script_dir/Caddyfile" /etc/caddy/Caddyfile
-echo "setup-lxc.sh: validated and installed /etc/caddy/Caddyfile"
+echo "setup-lxc.sh: validated and installed /etc/caddy/Caddyfile, wrote $caddy_env_file and $caddy_dropin_file"
 
 systemctl enable caddy >/dev/null 2>&1 || true
 
-# 6. Reload vs. restart: a changed EnvironmentFile/drop-in only takes
+# 7. Reload vs. restart: a changed EnvironmentFile/drop-in only takes
 #    effect on process start, never via `caddy reload`'s live hot-swap --
 #    so this must daemon-reload + restart whenever either changed this
 #    run (first run, or a changed hostname value); otherwise the cheaper
@@ -271,7 +294,7 @@ else
   echo "setup-lxc.sh: reloaded caddy (restarted if reload failed, e.g. first run)"
 fi
 
-# 7. Print the exact runner-registration commands. These are never run
+# 8. Print the exact runner-registration commands. These are never run
 # automatically: the registration token is single-use and must be fetched
 # from GitHub (Settings -> Actions -> Runners -> New self-hosted runner)
 # by Andrius himself, per docs/technical/runbook.md.
