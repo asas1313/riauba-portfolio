@@ -19,4 +19,5 @@ nav:
   - Home: index.md
   - User guide: user-guide/index.md
   - Technical: technical/index.md
+  - Deployment runbook: technical/runbook.md
   - Changelog: CHANGELOG.md
