@@ -11,6 +11,14 @@
   the real domain is documented as a configuration-only change — see
   [ADR-0005](adr/0005-homelab-self-hosted-runner-deployment.md) and the new
   [deployment runbook](technical/runbook.md).
+- Follow-up fix: `infra/setup-lxc.sh` now resolves `PROD_HOSTS`/`STAGING_HOSTS` from two
+  checked-in files, `infra/production.env`/`infra/staging.env`, validating and failing loudly
+  before any install step if either is missing or incomplete, generating the systemd
+  `EnvironmentFile`/drop-in itself, and validating the Caddyfile with `caddy validate` before
+  ever installing or reloading it. These two files already provision the final `riauba.org`/
+  `staging.riauba.org` hostnames directly, ahead of the rest of this entry's `*.riaubyne.eu`
+  default — see the [runbook](technical/runbook.md)'s step 2 warning and "Switch to riauba.org"
+  checklist for what that means for the remaining, still-pending Cloudflare-side cutover.
 - Deploys run on a self-hosted GitHub Actions runner (`homelab-riauba`, unprivileged `deploy` OS
   user) that only ever connects outbound to GitHub — no SSH keys, no open inbound ports and no
   deploy secrets exist anywhere in this setup. The build itself always happens on a GitHub-hosted

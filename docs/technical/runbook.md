@@ -123,6 +123,13 @@ Both temporary hostnames point at the *same* Caddy instance — `infra/Caddyfile
 blocks (addressed by `PROD_HOSTS`/`STAGING_HOSTS`) tell it apart by the `Host` header, routing
 each to its own environment's `current` directory.
 
+!!! note "These may already be riauba.org/staging.riauba.org"
+    Per step 2's warning, `infra/production.env`/`infra/staging.env` are already set to
+    `riauba.org`/`staging.riauba.org`, not the temporary hostnames in the table above. If that
+    cutover has already happened, add Tunnel public hostnames for `riauba.org`/
+    `staging.riauba.org` here instead (or in addition) — don't assume the temporary hostnames are
+    still the ones Caddy is actually listening for.
+
 ## 5. Set the GitHub Environment variables
 
 In the GitHub repository's **Settings → Environments**, configure both `staging` and
@@ -142,6 +149,14 @@ checked-in files `infra/production.env`/`infra/staging.env`, read automatically 
 either hostname later, edit the corresponding file directly, then either re-run
 `infra/setup-lxc.sh`, or run `systemctl daemon-reload && systemctl restart caddy` yourself.
 
+!!! note "SITE_URL may be out of sync with PROD_HOSTS/STAGING_HOSTS"
+    The `SITE_URL` values in the table above still assume the temporary `*.riaubyne.eu`
+    hostnames, independently of whatever `infra/production.env`/`infra/staging.env` currently
+    resolve Caddy's own `PROD_HOSTS`/`STAGING_HOSTS` to (see step 2's warning) — the two are set
+    in different places and don't have to match at every point in time. Keep `SITE_URL` pointed
+    at whichever hostname is actually reachable right now; don't assume it already matches
+    `PROD_HOSTS`/`STAGING_HOSTS` just because this page's table hasn't been updated.
+
 ## 6. First deploy
 
 1. Merge a change to `main` (or just push to `main` once this spec itself is merged) —
@@ -151,7 +166,10 @@ either hostname later, edit the corresponding file directly, then either re-run
    `github.actor == github.repository_owner` — a safety gate so only Andrius' own pushes can
    ever reach the homelab runner.
 3. Confirm with `curl -I https://portfolio-staging.riaubyne.eu/` (or just open it in a browser)
-   and check the `X-Robots-Tag: noindex, nofollow` header is present.
+   and check the `X-Robots-Tag: noindex, nofollow` header is present. If `STAGING_HOSTS` has
+   already moved to `staging.riauba.org` (step 2's warning), verify against that hostname instead
+   — `make smoke`'s own default has the same caveat (`STAGING_URL`/`PROD_URL` override it; see
+   the Makefile's `smoke` target).
 4. For production: **Actions → deploy-production → Run workflow**, type `deploy` into the
    `confirm` input, leave `ref` empty (defaults to the sha currently live on staging). Watch
    `resolve-ref` → `build` → `deploy` run in order.
