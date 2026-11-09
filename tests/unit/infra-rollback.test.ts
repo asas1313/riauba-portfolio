@@ -96,6 +96,26 @@ describe("infra/rollback.sh (AC-5)", () => {
     expect(currentTarget("staging")).toBe("releases/shaA");
   });
 
+  it("after a deploy-after-rollback, finds the release actually live immediately before the new deploy, not the deploy-chronology neighbor", () => {
+    // Regression test (QA finding): deploy A, B, C; roll back (no sha) to
+    // B; deploy D (a hotfix on top of the rolled-back B); roll back again
+    // (no sha) must land on B -- the release that was actually live
+    // immediately before D was deployed -- never C (D's neighbor in pure
+    // deploy order, which was never live at the time D went out).
+    deploy("staging", "shaA");
+    deploy("staging", "shaB");
+    deploy("staging", "shaC");
+
+    runRollback("staging"); // -> shaB
+    expect(currentTarget("staging")).toBe("releases/shaB");
+
+    deploy("staging", "shaD"); // hotfix deployed on top of the rolled-back B
+    expect(currentTarget("staging")).toBe("releases/shaD");
+
+    runRollback("staging"); // must land on shaB, not shaC
+    expect(currentTarget("staging")).toBe("releases/shaB");
+  });
+
   it("with an explicit sha, repoints to that exact release", () => {
     deploy("production", "shaA");
     deploy("production", "shaB");
