@@ -461,9 +461,10 @@ Two environment variables drive the Astro build itself (spec 004):
   (default `"true"` until the runbook's "Switch to riauba.org" checklist flips it to `"false"`).
 
 `make smoke ENV=<staging|production> [SHA=<sha>]` (see [Runbook](#runbook) below) reads
-`STAGING_URL`/`PROD_URL` (falling back to the temporary `*.riaubyne.eu` hostnames) and, when
-given, compares the deployed `/version.txt` against `SHA` — it is a verification command, not a
-build-time one, and consumes no variables that affect the Astro build itself.
+`STAGING_URL`/`PROD_URL` (falling back to the real `riauba.org`/`staging.riauba.org`
+hostnames) and, when given, compares the deployed `/version.txt` against `SHA` — it is a
+verification command, not a build-time one, and consumes no variables that affect the Astro
+build itself.
 
 ## API reference
 

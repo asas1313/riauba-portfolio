@@ -11,7 +11,7 @@ Lithuanian version later (spec 005).
 - PDF CV generated at build time with Playwright printing the `/cv/print` route → `dist/andrius-riauba-cv.pdf`
 - Tests: Vitest (unit, content schema validation), Playwright (e2e, accessibility via @axe-core/playwright)
 - Docs: MkDocs Material under docs/
-- Hosting: Caddy on Andrius' Proxmox homelab, deployed via a self-hosted GitHub Actions runner (no secrets); temporary `*.riaubyne.eu` hostnames until `riauba.org` DNS is live (spec 004, see `docs/technical/runbook.md`)
+- Hosting: Caddy on Andrius' Proxmox homelab, deployed via a self-hosted GitHub Actions runner (no secrets); `riauba.org`/`staging.riauba.org` DNS is live (spec 004, see `docs/technical/runbook.md`)
 
 ## Commands
 - `make setup` · `make test` · `make e2e` · `make lint` · `make format` · `make security` · `make docs` · `make build`

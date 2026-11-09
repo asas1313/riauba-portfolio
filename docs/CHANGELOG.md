@@ -6,9 +6,9 @@
 
 - Real hosting: both staging and production now run on Andrius' Proxmox homelab, served by Caddy
   behind the existing Cloudflare Tunnel (`vepryne-pve`), with TLS terminating at Cloudflare and no
-  inbound port open on the portfolio LXC at all. Temporary `portfolio.riaubyne.eu`/
-  `portfolio-staging.riaubyne.eu` hostnames are used until `riauba.org` DNS is live; switching to
-  the real domain is documented as a configuration-only change — see
+  inbound port open on the portfolio LXC at all. Serves `riauba.org`/`staging.riauba.org` —
+  switching from the temporary `portfolio.riaubyne.eu`/`portfolio-staging.riaubyne.eu` hostnames
+  used during spec 004's initial rollout was a configuration-only change, as documented — see
   [ADR-0005](adr/0005-homelab-self-hosted-runner-deployment.md) and the new
   [deployment runbook](technical/runbook.md).
 - Deploys run on a self-hosted GitHub Actions runner (`homelab-riauba`, unprivileged `deploy` OS

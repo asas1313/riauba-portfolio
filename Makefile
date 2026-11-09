@@ -92,10 +92,9 @@ build:
 # meaningful "local" `make deploy` against a homelab LXC any more.
 #
 # `make smoke ENV=<staging|production> [SHA=<sha>]`: resolves the public
-# URL from STAGING_URL/PROD_URL (falling back to the temporary
-# *.riaubyne.eu hostnames so this works before any GitHub Environment
-# variable naming is finalised -- see the runbook's "Switch to riauba.org"
-# checklist for when that changes), checks `/`, `/cv`, `/projects`, the
+# URL from STAGING_URL/PROD_URL (falling back to the real riauba.org
+# hostnames -- the temporary *.riaubyne.eu hostnames from spec 004 are
+# retired now that riauba.org DNS is live), checks `/`, `/cv`, `/projects`, the
 # real CV PDF filename and `/docs/` all return 200, optionally compares
 # `/version.txt` to SHA when given, and for ENV=staging additionally
 # requires the X-Robots-Tag noindex header on every response.
@@ -106,8 +105,8 @@ smoke:
 		*) echo "smoke FAILED: ENV must be 'staging' or 'production', got '$(ENV)'"; exit 2 ;; \
 	esac
 	@url=$$( [ "$(ENV)" = "production" ] \
-		&& echo "$${PROD_URL-https://portfolio.riaubyne.eu}" \
-		|| echo "$${STAGING_URL-https://portfolio-staging.riaubyne.eu}" ); \
+		&& echo "$${PROD_URL-https://riauba.org}" \
+		|| echo "$${STAGING_URL-https://staging.riauba.org}" ); \
 	for path in / /cv /projects /andrius-riauba-cv.pdf /docs/; do \
 		curl -fsS "$$url$$path" >/dev/null || { echo "smoke FAILED: $$url$$path"; exit 1; }; \
 	done; \
