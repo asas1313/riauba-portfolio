@@ -115,9 +115,21 @@ homelab services), add two public hostnames pointing at this LXC's Caddy (port 8
 
 Both hostnames point at the *same* Caddy instance — `infra/Caddyfile`'s two site blocks
 (addressed by `PROD_HOSTS`/`STAGING_HOSTS`) tell it apart by the `Host` header, routing each to
-its own environment's `current` directory. (This cutover is done: the original temporary
-`portfolio.riaubyne.eu`/`portfolio-staging.riaubyne.eu` hostnames from spec 004's initial
-rollout no longer resolve — see "Switch to riauba.org", below.)
+its own environment's `current` directory. The original temporary `portfolio.riaubyne.eu`/
+`portfolio-staging.riaubyne.eu` hostnames from spec 004's initial rollout no longer resolve.
+
+!!! warning "riauba.org/www.riauba.org: check the DNS record *type*, not just that a Tunnel hostname exists"
+    `staging.riauba.org` is correctly a **Tunnel**-type DNS record. The apex `riauba.org` (and
+    `www.riauba.org`) can independently have a leftover plain **A** record (e.g. a registrar's
+    default parking IP) that silently takes precedence even after a Tunnel public hostname entry
+    for the same name is added in the Zero Trust dashboard — Cloudflare does not always overwrite
+    an existing conflicting record. Symptom: Cloudflare returns `522` (connection timed out) for
+    `riauba.org` while `curl -H "Host: riauba.org" http://localhost:80/` run directly on the LXC
+    returns a clean `200` from Caddy — i.e. Caddy is fine, the DNS record just never routes
+    through the Tunnel. Fix: in the DNS tab (not just Zero Trust → Tunnels → Public Hostname),
+    delete the stale A record for `riauba.org`/`www.riauba.org` and re-add the hostname from the
+    Tunnel's Public Hostname screen so Cloudflare creates the correct Tunnel-type record, same as
+    `staging.riauba.org`'s.
 
 ## 5. Set the GitHub Environment variables
 
@@ -184,22 +196,30 @@ owned by root) and wired into Caddy's unit via the drop-in
 of the cheaper `systemctl reload`) when either file's content actually changed in that run —
 `caddy reload`'s live config hot-swap never re-reads a systemd `EnvironmentFile`.
 
-## "Switch to riauba.org" checklist (done)
+## "Switch to riauba.org" checklist (staging done, production DNS still open)
 
 Spec 004's third user story: moving production from the temporary `portfolio.riaubyne.eu`
 hostname to the real `riauba.org` domain was meant to be a configuration change only, never a
-code change — it now is, end to end. The temporary `*.riaubyne.eu` hostnames no longer resolve.
+code change. The temporary `*.riaubyne.eu` hostnames no longer resolve at all, but `riauba.org`
+itself is **not reachable yet** — see the warning under step 4 above: its DNS record (and
+`www.riauba.org`'s) is a stale plain **A** record to an unrelated IP, not a Tunnel record, so
+Cloudflare returns `522` for it. Confirmed via `curl -H "Host: riauba.org"
+http://localhost:80/` run directly on the LXC, which returns a clean `200` from Caddy — the
+Caddy/app side is correct; only the Cloudflare DNS record needs fixing (see that warning for the
+exact fix).
 
 1. ~~Add the `riauba.org` domain to the Cloudflare account~~ — done.
-2. ~~Add Cloudflare Tunnel public hostnames `riauba.org`/`staging.riauba.org` → the portfolio
-   LXC's Caddy, plus `www.riauba.org` → `riauba.org` redirect~~ — done. (The Caddy-side
-   `PROD_HOSTS`/`STAGING_HOSTS` values were already `riauba.org`/`staging.riauba.org` via
-   `infra/production.env`/`infra/staging.env`, per
-   `docs/specs/004-deployment-setup-lxc-fixes.plan.md`.)
+2. Add Cloudflare Tunnel public hostnames `riauba.org`/`staging.riauba.org` → the portfolio
+   LXC's Caddy, plus `www.riauba.org` → `riauba.org` redirect. **`staging.riauba.org` is done**
+   (a correct Tunnel-type DNS record). `riauba.org`/`www.riauba.org` are **not** — delete their
+   stale A records and re-add them from the Tunnel's Public Hostname screen (see the warning
+   under step 4 above). (The Caddy-side `PROD_HOSTS`/`STAGING_HOSTS` values were already
+   `riauba.org`/`staging.riauba.org` via `infra/production.env`/`infra/staging.env`, per
+   `docs/specs/004-deployment-setup-lxc-fixes.plan.md`, and are confirmed working.)
 3. ~~Update the `production`/`staging` GitHub Environment `SITE_URL` variables to
    `https://riauba.org`/`https://staging.riauba.org`~~ — done.
 4. ~~Set the `production` Environment's `PROD_NOINDEX` variable to `false`~~ — done; production
-   is now indexable by search engines.
+   is now indexable by search engines, once it's actually reachable.
 5. Redeploy production (**Actions → deploy-production → Run workflow**, `confirm=deploy`) so the
    next build picks up `PROD_NOINDEX=false` (the `dist/.noindex` sentinel stops being written, so
    Caddy stops sending the noindex header) — still to do after this merges.
