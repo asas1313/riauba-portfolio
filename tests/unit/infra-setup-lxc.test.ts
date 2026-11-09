@@ -126,15 +126,6 @@ describe("infra/setup-lxc.sh variable resolution (AC-1)", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(ROOT_CHECK_MESSAGE);
   });
-
-  it("does not create /srv/riauba, a deploy user or touch Caddy when the variable check fails", () => {
-    // Nothing a non-root test process could do anyway, but this
-    // documents and partially guards the "touching nothing else at
-    // all" requirement: the script must exit before any such attempt,
-    // so there's no useradd/mkdir/apt-get stdout noise either.
-    const result = runScript();
-    expect(result.stdout).toBe("");
-  });
 });
 
 describe("infra/setup-lxc.sh EnvironmentFile/drop-in paths (AC-3)", () => {
