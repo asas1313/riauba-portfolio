@@ -40,7 +40,18 @@ for env_name in staging production; do
 done
 chown -R deploy:deploy /srv/riauba
 
-# 3. Caddy, from its official apt repository (idempotent: skipped if
+# 3. `make` -- the deploy-staging.yml/deploy-production.yml workflows run
+#    `make smoke` on this runner after infra/deploy.sh, and the bare LXC
+#    image doesn't ship it.
+if command -v make >/dev/null 2>&1; then
+  echo "setup-lxc.sh: make already installed, skipping"
+else
+  apt-get update
+  apt-get install -y make
+  echo "setup-lxc.sh: installed make"
+fi
+
+# 4. Caddy, from its official apt repository (idempotent: skipped if
 #    already installed).
 if command -v caddy >/dev/null 2>&1; then
   echo "setup-lxc.sh: caddy already installed ($(caddy version)), skipping install"
@@ -56,7 +67,7 @@ else
   echo "setup-lxc.sh: installed caddy ($(caddy version))"
 fi
 
-# 4. Install infra/Caddyfile and reload (always re-applied, even when
+# 5. Install infra/Caddyfile and reload (always re-applied, even when
 #    Caddy was already installed, so a Caddyfile edit takes effect on a
 #    re-run).
 install -m 0644 "$script_dir/Caddyfile" /etc/caddy/Caddyfile
@@ -64,7 +75,7 @@ systemctl enable caddy >/dev/null 2>&1 || true
 systemctl reload caddy 2>/dev/null || systemctl restart caddy
 echo "setup-lxc.sh: installed /etc/caddy/Caddyfile and reloaded caddy"
 
-# 5. Print the exact runner-registration commands. These are never run
+# 6. Print the exact runner-registration commands. These are never run
 # automatically: the registration token is single-use and must be fetched
 # from GitHub (Settings -> Actions -> Runners -> New self-hosted runner)
 # by Andrius himself, per docs/technical/runbook.md.
